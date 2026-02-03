@@ -1,0 +1,143 @@
+import { create } from "zustand";
+import { api } from "../services/api";
+
+export const useSystemStore = create((set, get) => ({
+  // State
+  health: {
+    status: "unknown",
+    server: "Printer Dashboard Backend",
+    version: "1.2.0",
+    uptime: 0,
+    timestamp: null,
+    agents: {
+      connected: 0,
+      total: 0,
+    },
+    dashboards: 0,
+  },
+  settings: {
+    autoRefresh: process.env.NEXT_PUBLIC_AUTO_REFRESH === "true",
+    refreshInterval:
+      parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL),
+    lowInkThreshold: parseInt(process.env.NEXT_PUBLIC_LOW_INK_THRESHOLD) || 15,
+    criticalInkThreshold:
+      parseInt(process.env.NEXT_PUBLIC_CRITICAL_INK_THRESHOLD) || 10,
+    enablePrinterControl:
+      process.env.NEXT_PUBLIC_ENABLE_PRINTER_CONTROL === "true",
+    enableWebSocket: process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET === "true",
+  },
+  loading: false,
+  error: null,
+
+  // Actions
+  fetchHealth: async () => {
+    try {
+      set({ loading: true });
+      const data = await api.getHealth();
+
+      set({
+        health: {
+          status: data.status || "unknown",
+          server: data.server || "Printer Dashboard Backend",
+          version: data.version || "1.0.0",
+          uptime: data.uptime || 0,
+          timestamp: data.timestamp || new Date().toISOString(),
+          agents: data.agents || { connected: 0, total: 0 },
+          dashboards: data.dashboards || 0,
+        },
+        loading: false,
+        error: null,
+      });
+
+      return data;
+    } catch (error) {
+      console.error("Failed to fetch health:", error);
+      set({
+        health: {
+          status: "error",
+          server: "Unknown",
+          version: "0.0.0",
+          uptime: 0,
+          timestamp: new Date().toISOString(),
+          agents: { connected: 0, total: 0 },
+          dashboards: 0,
+          error: error.message,
+        },
+        loading: false,
+        error: error.message,
+      });
+      throw error;
+    }
+  },
+
+  // Update settings
+  updateSettings: (newSettings) => {
+    const settings = get().settings;
+    set({
+      settings: {
+        ...settings,
+        ...newSettings,
+      },
+    });
+
+    // Simpan ke localStorage
+    localStorage.setItem(
+      "printerDashboardSettings",
+      JSON.stringify(get().settings),
+    );
+  },
+
+  loadSettings: () => {
+    const savedSettings = localStorage.getItem("printerDashboardSettings");
+
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        set({ settings: parsedSettings });
+      } catch (error) {
+        console.error("Failed to parse saved settings:", error);
+      }
+    }
+  },
+
+  // Auto refresh health
+  startHealthMonitoring: () => {
+    const interval = setInterval(() => {
+      get().fetchHealth();
+    }, 5000); 
+
+    // Initial fetch
+    get().fetchHealth();
+
+    return () => clearInterval(interval);
+  },
+
+  // Reset store
+  reset: () => {
+    set({
+      health: {
+        status: "unknown",
+        server: "Printer Dashboard Backend",
+        version: "1.0.0",
+        uptime: 0,
+        timestamp: null,
+        agents: { connected: 0, total: 0 },
+        dashboards: 0,
+      },
+      settings: {
+        autoRefresh: process.env.NEXT_PUBLIC_AUTO_REFRESH === "true",
+        refreshInterval:
+          parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL),
+        lowInkThreshold:
+          parseInt(process.env.NEXT_PUBLIC_LOW_INK_THRESHOLD) || 15,
+        criticalInkThreshold:
+          parseInt(process.env.NEXT_PUBLIC_CRITICAL_INK_THRESHOLD) || 10,
+        enablePrinterControl:
+          process.env.NEXT_PUBLIC_ENABLE_PRINTER_CONTROL === "true",
+        enableWebSocket: process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET === "true",
+      },
+      loading: false,
+      error: null,
+    });
+  },
+}));
