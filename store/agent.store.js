@@ -1,235 +1,232 @@
+// store/app.store.js
 import { create } from "zustand";
 import { api } from "../services/api";
+import { persist } from "zustand/middleware";
 
-export const useAgentStore = create((set, get) => ({
-    // ==================== STATE ====================
-    agents: [],
-    agentDetails: {},
-    selectedAgentId: null,
-    agentsLoading: false,
-    agentsError: null,
-    lastAgentsFetch: 0,
+export const useAppStore = create(
+  persist(
+    (set, get) => ({
+      // State
+      agents: [],
+      agentsWithKeys: {},
+      printers: [],
+      selectedAgentId: null,
+      health: null,
+      companies: [],
+      departments: [],
+      monthlyReport: null,
+      isLoading: false,
+      error: null,
 
-    // ==================== ACTIONS ====================
-
-    // 1. Fetch lightweight agents list
-    fetchAllAgents: async () => {
+      // ========== AGENTS ==========
+      loadAgents: async () => {
         try {
-            const now = Date.now();
-            if (now - get().lastAgentsFetch < 3000 && get().agents.length > 0) {
-                console.log("⏸️ Skipping agents fetch - too soon");
-                return get().agents;
-            }
+          set({ isLoading: true, error: null });
 
-            console.log("🔄 Fetching all agents...");
-            set({ agentsLoading: true, agentsError: null });
+          const res = await api.getAllAgents();
+          const agents = res.agents || [];
 
-            const data = await api.getConnectedAgents();
+          // Simpan API key per agent
+          const agentsWithKeys = {};
+          agents.forEach(agent => {
+            // API Key ada di endpoint detail, belum di list
+            // Nanti akan diisi pas load agent detail
+            agentsWithKeys[agent.id] = null;
+          });
 
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch agents");
-            }
+          set({
+            agents,
+            agentsWithKeys,
+            isLoading: false
+          });
 
-            console.log(`✅ Fetched ${data.agents?.length || 0} agents`);
-
-            // Simple normalization
-            const normalizedAgents = (data.agents || []).map(agent => ({
-                agentId: agent.id || agent.agentId,
-                name: agent.name || "Unknown Agent",
-                company: agent.company || "Unknown Company",
-                status: agent.status || "unknown",
-                printerCount: agent.printerCount || 0,
-                lastSeen: agent.lastSeen,
-                connectedAt: agent.connectedAt,
-                connected: agent.connected || false,
-
-                location: "Loading...",
-                department: "Loading...",
-            }));
-
-            set({
-                agents: normalizedAgents,
-                agentsLoading: false,
-                lastAgentsFetch: now,
-            });
-
-            return normalizedAgents;
+          return agents;
 
         } catch (error) {
-            console.error("❌ Failed to fetch agents:", error);
-            set({
-                agentsError: error.message,
-                agentsLoading: false,
-            });
-            throw error;
+          console.error("Failed to load agents:", error);
+          set({ error: error.message, isLoading: false });
+          throw error;
         }
-    },
+      },
 
-    // 2. Fetch detailed agent data dan enrich agents list
-    fetchAgentDetails: async (agentId) => {
-        if (!agentId) {
-            throw new Error("Agent ID is required");
-        }
+      selectAgent: async (agentId) => {
+        if (!agentId) return;
 
         try {
-            console.log(`🔄 Fetching details for agent ${agentId}...`);
-            set({ agentsLoading: true, agentsError: null });
+          set({ selectedAgentId: agentId, isLoading: true });
 
-            const data = await api.getAgent(agentId);
+          const res = await api.getAgent(agentId);
 
-            if (!data.success) {
-                throw new Error(data.error || "Failed to fetch agent details");
-            }
+          if (res.success) {
+            // Simpan API key agent dari response detail
+            const agentApiKey = res.agent?.apiKey;
 
-            console.log(`✅ Agent ${agentId} details fetched (${data.printers?.length || 0} printers)`);
-
-            // Simpan data detail ke cache
             set(state => ({
-                agentDetails: {
-                    ...state.agentDetails,
-                    [agentId]: {
-                        ...data.agent,
-                        printers: data.printers || [],
-                        summary: data.summary || {},
-                        lastUpdated: data.timestamp,
-                    }
-                }
+              printers: res.printers || [],
+              agentsWithKeys: {
+                ...state.agentsWithKeys,
+                [agentId]: agentApiKey
+              },
+              isLoading: false
             }));
 
-            // Enrich agents list dengan data detail
-            set(state => ({
-                agents: state.agents.map(agent =>
-                    agent.agentId === agentId
-                        ? {
-                            ...agent,
-                            // Update dengan data detail yang lebih lengkap
-                            name: data.agent?.name || agent.name,
-                            company: data.agent?.company || agent.company,
-                            location: data.agent?.location || agent.location,
-                            department: data.agent?.department || agent.department,
-                            customerId: data.agent?.customerId,
-                            printerCount: data.printers?.length || agent.printerCount,
-                            summary: data.summary,
-                            // Mark as enriched
-                            enriched: true,
-                        }
-                        : agent
-                ),
-                agentsLoading: false,
-            }));
-
-            return data;
+            return res;
+          }
 
         } catch (error) {
-            console.error(`❌ Failed to fetch agent ${agentId} details:`, error);
-            set({
-                agentsError: error.message,
-                agentsLoading: false,
-            });
-            throw error;
+          console.error(`Failed to load agent ${agentId}:`, error);
+          set({
+            error: error.message,
+            isLoading: false,
+            printers: []
+          });
+          throw error;
         }
-    },
+      },
 
-    // 3. Select agent dan auto-fetch details
-    selectAgent: async (agentId) => {
-        if (!agentId) {
-            console.error("❌ Agent ID is required");
-            return;
+      // ========== COMPANY & DEPARTEMENT ==========
+      loadCompanies: async () => {
+        try {
+          const res = await api.getCompanies();
+          set({ companies: res.data || [] });
+          return res.data;
+        } catch (error) {
+          console.error("Failed to load companies:", error);
+          throw error;
         }
+      },
 
-        console.log(`🔧 Selecting agent: ${agentId}`);
-        set({ selectedAgentId: agentId });
-
-        // Auto-fetch details jika belum ada
-        const state = get();
-        if (!state.agentDetails[agentId]) {
-            setTimeout(() => {
-                get().fetchAgentDetails(agentId);
-            }, 100);
+      createCompany: async (companyData) => {
+        try {
+          const res = await api.createCompany(companyData);
+          await get().loadCompanies();
+          return res;
+        } catch (error) {
+          console.error("Failed to create company:", error);
+          throw error;
         }
+      },
+      deleteCompany: async (companyId) => {
+        try {
+          const res = await api.deleteCompany(companyId);
+          await get().loadCompanies();
+          return res;
+        } catch (error) {
+          console.error("Failed to delete company:", error);
+          throw error;
+        }
+      },
 
-        // Return agent info
-        return state.agents.find(a => a.agentId === agentId);
-    },
+      loadDepartments: async (companyId) => {
+        try {
+          const res = await api.getDepartments(companyId);
+          set({ departments: res.data || [] });
+          return res.data;
+        } catch (error) {
+          console.error("Failed to load departments:", error);
+          throw error;
+        }
+      },
 
-    // 4. Get merged agent data (lightweight + details)
-    getAgent: (agentId) => {
-        const state = get();
-        const baseAgent = state.agents.find(a => a.agentId === agentId);
-        const details = state.agentDetails[agentId];
+      createDepartment: async (companyId, name) => {
+        try {
+          const res = await api.createDepartment(companyId, name);
+          // Refresh departments
+          await get().loadDepartments(companyId);
+          return res;
+        } catch (error) {
+          console.error("Failed to create department:", error);
+          throw error;
+        }
+      },
 
-        if (!baseAgent) return null;
+      // ========== REPORTS ==========
+      loadMonthlyReport: async (year, month) => {
+        try {
+          const res = await api.getMonthlyReport(year, month);
+          set({ monthlyReport: res });
+          return res;
+        } catch (error) {
+          console.error("Failed to load monthly report:", error);
+          throw error;
+        }
+      },
 
-        // Merge data
+      loadDailyReports: async (agentId) => {
+        try {
+          const res = await api.getAgentDailyReports(agentId);
+          return res;
+        } catch (error) {
+          console.error("Failed to load daily reports:", error);
+          throw error;
+        }
+      },
+
+      // ========== SYSTEM ==========
+      loadHealth: async () => {
+        try {
+          const res = await api.getHealth();
+          set({ health: res });
+          return res;
+        } catch (error) {
+          console.error("Failed to load health:", error);
+          throw error;
+        }
+      },
+
+      // ========== DASHBOARD ==========
+      loadDashboard: async () => {
+        await Promise.all([
+          get().loadAgents(),
+          get().loadHealth()
+        ]);
+      },
+
+      // ========== GETTERS ==========
+      selectedAgent: () => {
+        const { agents, selectedAgentId } = get();
+        return agents.find(a => a.id === selectedAgentId) || null;
+      },
+
+      getAgentApiKey: (agentId) => {
+        return get().agentsWithKeys[agentId];
+      },
+
+      getStats: () => {
+        const printers = get().printers;
         return {
-            ...baseAgent,
-            ...details,
-            // Ensure printerCount is accurate
-            printerCount: details?.printers?.length || baseAgent.printerCount,
-            // Summary from details
-            summary: details?.summary,
+          total: printers.length,
+          online: printers.filter(p =>
+            p.status === "READY" || p.status === "online" || p.status === "printing"
+          ).length,
+          offline: printers.filter(p =>
+            p.status !== "READY" &&
+            p.status !== "online" &&
+            p.status !== "printing"
+          ).length,
+          lowInk: printers.filter(p => p.hasLowInk).length,
+          criticalInk: printers.filter(p => p.hasCriticalInk).length,
+          pagesToday: printers.reduce((sum, p) => sum + (p.pagesToday || 0), 0)
         };
-    },
+      },
 
-    // 5. Get selected agent (merged)
-    getSelectedAgent: () => {
+      refresh: async () => {
+        await get().loadDashboard();
         const { selectedAgentId } = get();
-        if (!selectedAgentId) return null;
-        return get().getAgent(selectedAgentId);
-    },
-
-    // 6. Get selected agent printers
-    getSelectedAgentPrinters: () => {
-        const { selectedAgentId, agentDetails } = get();
-        if (!selectedAgentId) return [];
-        return agentDetails[selectedAgentId]?.printers || [];
-    },
-
-    // 7. Get selected agent summary
-    getSelectedAgentSummary: () => {
-        const { selectedAgentId, agentDetails } = get();
-        if (!selectedAgentId) return null;
-        return agentDetails[selectedAgentId]?.summary;
-    },
-
-    // 8. Helper functions
-    getOnlineAgentsCount: () => {
-        return get().agents.filter(a => a.status === "online").length;
-    },
-
-    getOfflineAgentsCount: () => {
-        return get().agents.filter(a => a.status === "offline").length;
-    },
-
-    // 9. Refresh semua data
-    refreshAll: async () => {
-        await get().fetchAllAgents();
-        const selectedId = get().selectedAgentId;
-        if (selectedId) {
-            await get().fetchAgentDetails(selectedId);
+        if (selectedAgentId) {
+          await get().selectAgent(selectedAgentId);
         }
-    },
-
-    // 10. Sync dengan printer store (untuk compatibility)
-    syncWithPrinterStore: (printerStore) => {
-        const selectedAgent = get().getSelectedAgent();
-        if (selectedAgent) {
-            printerStore.setState({
-                selectedAgent,
-                printers: get().getSelectedAgentPrinters()
-            });
-        }
-    },
-
-    // 11. Reset
-    reset: () => {
-        set({
-            agents: [],
-            agentDetails: {},
-            selectedAgentId: null,
-            agentsLoading: false,
-            agentsError: null,
-            lastAgentsFetch: 0,
-        });
-    },
-}));
+      }
+    }),
+    {
+      name: "app-storage",
+      getStorage: () => localStorage,
+      partialize: (state) => ({
+        agents: state.agents,
+        agentsWithKeys: state.agentsWithKeys,
+        companies: state.companies,
+        departments: state.departments
+      })
+    }
+  )
+);

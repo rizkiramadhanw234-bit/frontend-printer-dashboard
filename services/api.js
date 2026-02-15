@@ -1,93 +1,130 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-const DASHBOARD_WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://192.168.18.60:5000";
 
-// Helper function untuk API calls
-async function fetchAPI(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+const getJWTToken = () => {
+  const token = localStorage.getItem('jwt_token');
+  console.log('🔑 JWT Token:', token ? token.substring(0, 20) + '...' : 'Tidak ada');
+  return token;
+};
 
-  const defaultOptions = {
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    ...options,
+// Helper buat dapetin API Key agent
+const getAgentApiKey = (agentId) => {
+  try {
+    const store = JSON.parse(localStorage.getItem('app-storage') || '{}');
+    return store.state?.agentsWithKeys?.[agentId];
+  } catch (e) {
+    return null;
+  }
+};
+
+async function fetchAPI(endpoint, options = {}, useAgentKey = false, agentId = null) {
+  const url = `${BASE_URL}${endpoint}`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...options.headers
   };
 
-  try {
-    console.log(`🔗 API Request: ${url}`);
-    const response = await fetch(url, defaultOptions);
+  if (useAgentKey && agentId) {
+    const agentKey = getAgentApiKey(agentId);
+    if (agentKey) {
+      headers['Authorization'] = `Bearer ${agentKey}`;
+      console.log(`🔑 Using AGENT API key for ${agentId}`);
+    } else {
+      console.warn(`⚠️ No agent API key found for ${agentId}`);
+    }
+  }
+  // 2. JWT Token (buat dashboard)
+  else {
+    const token = getJWTToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log(`🔑 Using JWT token`);
+    } else {
+      console.warn(`⚠️ No JWT token found!`);
+    }
+  }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(
-        `❌ API Error ${response.status}: ${errorText || response.statusText}`,
-      );
-      throw new Error(
-        `API Error ${response.status}: ${errorText || response.statusText}`,
-      );
+  console.log(`🌐 Fetching: ${url}`);
+
+  const res = await fetch(url, { headers, ...options });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`❌ API Error ${res.status}:`, errorText);
+
+    // Kalo 401 dan pake JWT, redirect ke login
+    if (res.status === 401 && !useAgentKey) {
+      console.log('🚫 JWT token invalid, redirecting to login...');
+      localStorage.removeItem('jwt_token');
+      window.location.href = '/login';
     }
 
-    const data = await response.json();
-    console.log(`✅ API Response ${endpoint}:`, data);
-    return data;
-  } catch (error) {
-    console.error(`❌ API call failed for ${endpoint}:`, error);
-    throw error;
+    throw new Error(`API Error ${res.status}: ${errorText}`);
   }
+
+  const data = await res.json();
+  console.log(`✅ API Success:`, endpoint, data);
+  return data;
 }
 
-// Main API exports
 export const api = {
-  // auth endpoints
+  // ========== AUTH - PAKE JWT ==========
   login: (email, password) =>
-    fetchAPI("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
+    fetchAPI('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
     }),
-  logout: () => fetchAPI("/api/auth/logout"),
-  checkAuth: () => fetchAPI("/api/auth/check"),
 
-  // Health endpoints
-  getHealth: () => fetchAPI("/api/health"),
+  logout: () => fetchAPI('/api/auth/logout', { method: 'POST' }),
+  checkAuth: () => fetchAPI('/api/auth/check'),
 
-  // Agent endpoints
-  getConnectedAgents: () => fetchAPI("/api/connected-agents"),
-  getAgent: (agentId) => fetchAPI(`/api/agents/${agentId}`),
+  // ========== DASHBOARD ENDPOINTS - PAKE JWT ==========
+  getAllAgents: () => fetchAPI('/api/agents'),
+  getHealth: () => fetchAPI('/api/health'),
+  getWebsocketStatus: () => fetchAPI('/api/websocket/status'),
 
-  // Printer endpoints
-  getPrinter: (agentId, printerName) =>
-    fetchAPI(
-      `/api/agents/${agentId}/printer?name=${encodeURIComponent(printerName)}`,
-    ),
+  // ========== COMPANY & DEPARTEMENT - PAKE JWT ==========
+  getCompanies: () => fetchAPI('/api/company'),
+  getDepartments: (companyId) => fetchAPI(`/api/departement/${companyId}`),
+  createDepartment: (companyId, name) =>
+    fetchAPI(`/api/company/${companyId}/departements`, {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    }),
 
-  // Printer control
+  // ========== AGENT DETAIL - PAKE AGENT API KEY ==========
+  getAgent: (agentId) =>
+    fetchAPI(`/api/agents/${agentId}`, {}, true, agentId),
+
+  getAgentDailyReports: (agentId) =>
+    fetchAPI(`/api/agents/${agentId}/daily-reports`, {}, true, agentId),
+
+  // ========== PRINTER CONTROL - PAKE AGENT API KEY ==========
   pausePrinter: (agentId, printerName) =>
     fetchAPI(`/api/agents/${agentId}/printer/pause`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ printerName }),
-    }),
+      method: 'POST',
+      body: JSON.stringify({ printerName })
+    }, true, agentId),
 
   resumePrinter: (agentId, printerName) =>
     fetchAPI(`/api/agents/${agentId}/printer/resume`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ printerName }),
+      method: 'POST',
+      body: JSON.stringify({ printerName })
+    }, true, agentId),
+
+  // ========== REPORTS - PAKE JWT ==========
+  getMonthlyReport: (year, month) =>
+    fetchAPI(`/api/agents/reports/monthly?year=${year}&month=${month}`),
+
+  createCompany: (companyData) =>
+    fetchAPI('/api/company', {
+      method: 'POST',
+      body: JSON.stringify(companyData)
     }),
 
-  // Report endpoints
-  getDailyReport: () => fetchAPI("/api/reports/daily"),
-  getAgentDailyReport: (agentId) => fetchAPI(`/api/reports/daily/${agentId}`),
-  getMonthlyReport: (year, month) =>
-    fetchAPI(`/api/reports/monthly?year=${year}&month=${month}`),
+  deleteCompany: (companyId) =>                          
+    fetchAPI(`/api/company/${companyId}`, {
+      method: 'DELETE'
+    }),
 };
-
-export default api;

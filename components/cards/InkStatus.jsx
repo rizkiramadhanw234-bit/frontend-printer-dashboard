@@ -86,9 +86,9 @@ export default function InkStatus({ printerName }) {
           if (level === null) return null;
 
           const status = getColorProgress(color, level);
-          const statusClass = status === "destructive" ? "text-red-600" : 
-                            status === "warning" ? "text-amber-600" : 
-                            "text-green-600";
+          const statusClass = status === "destructive" ? "text-red-600" :
+            status === "warning" ? "text-amber-600" :
+              "text-green-600";
 
           return (
             <Card key={color} className="h-full">
@@ -108,14 +108,14 @@ export default function InkStatus({ printerName }) {
                       <p className="font-medium text-sm truncate">{getColorName(color)}</p>
                       <p className={`font-bold text-lg ${statusClass}`}>{level}%</p>
                     </div>
-                    <Progress 
-                      value={level} 
-                      className="h-2"
-                      indicatorClassName={
-                        status === "destructive" ? "bg-red-500" :
-                        status === "warning" ? "bg-amber-500" :
-                        "bg-green-500"
-                      }
+                    <Progress
+                      value={level}
+                      className={`
+                            h-2
+                            ${status === "destructive" ? "[&>div]:bg-red-500" : ""}
+                            ${status === "warning" ? "[&>div]:bg-amber-500" : ""}
+                            ${status === "default" ? "[&>div]:bg-green-500" : ""}
+                          `}
                     />
                   </div>
                 </div>

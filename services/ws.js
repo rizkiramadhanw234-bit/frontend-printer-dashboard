@@ -1,22 +1,27 @@
-const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL;
+const getWsUrl = () => {
+  const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
+  // Pastikan ada /ws/dashboard
+  return base.includes('/ws/') ? base : `${base}/ws/dashboard`;
+};
 
 class WebSocketService {
   constructor() {
+    this.wsUrl = getWsUrl();
     this.socket = null;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5; 
-    this.reconnectDelay = 10000; 
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 10000;
     this.subscriptions = new Map();
     this.isConnecting = false;
     this.heartbeatInterval = null;
     this.isServerAvailable = true;
-    this.lastConnectionAttempt = 0; 
+    this.lastConnectionAttempt = 0;
     this.MIN_CONNECTION_INTERVAL = 5000;
   }
 
   async connect() {
-    const now = Date.now();
+    console.log(`🔌 Connecting to: ${this.wsUrl}`);
+    this.socket = new WebSocket(this.wsUrl);
 
     // ⚠️ CEK: Jangan reconnect terlalu sering
     if (now - this.lastConnectionAttempt < this.MIN_CONNECTION_INTERVAL) {
@@ -276,7 +281,7 @@ class WebSocketService {
           timestamp: Date.now(),
         });
       }
-    }, 5000); 
+    }, 5000);
   }
 
   stopHeartbeat() {
