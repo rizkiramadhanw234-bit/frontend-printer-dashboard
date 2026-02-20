@@ -6,64 +6,116 @@ export const usePrinterStore = create((set, get) => ({
   agents: [],
   selectedAgent: null,
   printers: [],
+  allPrinters: [],
   agentDailyReports: {},
   monthlyReports: {},
-  
+
   // Actions yang bener
   fetchAllAgents: async () => {
-    const data = await api.getAllAgents(); // ✅ dari /api/agents
-    
+    const data = await api.getAllAgents();
+
     const enrichedAgents = data.agents.map(agent => ({
       // === CORE FIELDS ===
-      agentId: agent.id, // "AGENT_IBEBQNRH_CB7GYE"
-      id: agent.id, // backup field
-      name: agent.name, // "XBOOK_B14"
-      company: agent.company, // "Kudukuats"
-      department: agent.department, // "IT dev"
-      departmentId: agent.departmentId, // 5
-      
+      agentId: agent.id,
+      id: agent.id,
+      name: agent.name,
+      company: agent.company,
+      department: agent.department,
+      departmentId: agent.departmentId,
+
       // === CONNECTION INFO ===
-      hostname: agent.hostname, // "XBOOK_B14"
-      platform: agent.platform, // "win32"
-      ip: agent.ip, // "127.0.0.1"
-      status: agent.status, // "online"
-      isOnline: agent.isOnline, // true (dari API)
-      statusColor: agent.statusColor, // "success"
-      
+      hostname: agent.hostname,
+      platform: agent.platform,
+      ip: agent.ip,
+      status: agent.status,
+      isOnline: agent.isOnline,
+      statusColor: agent.statusColor,
+
       // === STATISTICS ===
-      printerCount: agent.printerCount, // 1
-      pagesToday: agent.pagesToday || "0", // "0" (string dari API)
-      printingCount: agent.printingCount || 0, // 0
-      
+      printerCount: agent.printerCount,
+      pagesToday: agent.pagesToday || "0",
+      printingCount: agent.printingCount || 0,
+
       // === TIMESTAMPS ===
-      lastSeen: agent.lastSeen, // "2026-02-11T04:52:35.000Z"
-      registeredAt: agent.registeredAt, // "2026-02-11T03:55:39.000Z"
-      
+      lastSeen: agent.lastSeen,
+      registeredAt: agent.registeredAt,
+
       // === FOR UI ===
-      connected: agent.isOnline || false, // untuk compatibility
-      location: "Unknown", // default (gak ada di API)
-      customerId: "office-001", // default (gak ada di API)
+      connected: agent.isOnline || false,
+      location: "Unknown",
+      customerId: "office-001",
     }));
-    
+
     set({ agents: enrichedAgents });
-    
+
     // Auto select pertama kalo belum ada
     if (enrichedAgents.length > 0 && !get().selectedAgent) {
       get().setSelectedAgent(enrichedAgents[0].agentId);
     }
-    
+
     return enrichedAgents;
   },
-  
+
+  fetchAllPrinters: async () => {
+    try {
+      const response = await api.getAllPrinters(); // { success, count, printers, timestamp }
+
+      set({ allPrinters: response.printers || [] });
+
+      return response;
+    } catch (error) {
+      console.error("Failed to fetch all printers:", error);
+      set({ allPrinters: [] });
+      throw error;
+    }
+  },
+
+  // Filter printers by status (dari allPrinters)
+  getPrintersByStatus: (status) => {
+    return get().allPrinters.filter(p => p.status === status);
+  },
+
+  // Filter printers by vendor
+  getPrintersByVendor: (vendor) => {
+    return get().allPrinters.filter(p => p.vendor === vendor);
+  },
+
+  // Hitung statistik dari semua printer
+  getAllPrintersStatistics: () => {
+    const printers = get().allPrinters;
+
+    const total = printers.length;
+    const online = printers.filter(p => p.status === "READY" || p.status === "ONLINE").length;
+    const offline = printers.filter(p => p.status === "OFFLINE").length;
+    const error = printers.filter(p => p.status === "ERROR" || p.status === "OTHER").length;
+    const printing = printers.filter(p => p.status === "PRINTING").length;
+
+    // Group by vendor
+    const byVendor = printers.reduce((acc, p) => {
+      const vendor = p.vendor || "Unknown";
+      acc[vendor] = (acc[vendor] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      total,
+      online,
+      offline,
+      error,
+      printing,
+      byVendor
+    };
+  },
+
   setSelectedAgent: async (agentId) => {
-    const data = await api.getAgent(agentId); // ✅ dari /api/agents/{id}
-    
+    const data = await api.getAgent(agentId);
+
     // Data agent detail dari API:
     // data.agent = { id, name, company, department, status, lastSeen, ... }
     // data.printers = array printer objects
     // data.statistics = { printerCount, totalPagesToday, ... }
     // data.system = { heartbeats, connections }
-    
+
     set({
       selectedAgent: {
         // Gabungkan base agent data dengan detail
@@ -80,43 +132,43 @@ export const usePrinterStore = create((set, get) => ({
       systemInfo: data.system || {},
     });
   },
-  
+
   // Daily reports untuk agent tertentu
   fetchAgentDailyReports: async (agentId) => {
     const data = await api.getAgentDailyReports(agentId);
-    
+
     set(state => ({
       agentDailyReports: {
         ...state.agentDailyReports,
         [agentId]: data
       }
     }));
-    
+
     return data;
   },
-  
+
   // Monthly report
   fetchMonthlyReport: async (year, month) => {
     const data = await api.getMonthlyReport(year, month);
-    
+
     set({
       monthlyReports: {
         ...get().monthlyReports,
         [`${year}-${month}`]: data
       }
     });
-    
+
     return data;
   },
-  
+
   // Helper untuk get printer berdasarkan nama
   getPrinterByName: (printerName) => {
-    return get().printers.find(p => 
-      p.name === printerName || 
+    return get().printers.find(p =>
+      p.name === printerName ||
       p.displayName === printerName
     );
   },
-  
+
   // Total pages today dari semua printers
   getTotalPagesToday: () => {
     return get().printers.reduce(
@@ -124,25 +176,25 @@ export const usePrinterStore = create((set, get) => ({
       0
     );
   },
-  
+
   // Get printers with issues
   getOfflinePrinters: () => {
-    return get().printers.filter(p => 
-      p.status !== "READY" && 
+    return get().printers.filter(p =>
+      p.status !== "READY" &&
       p.status !== "ONLINE" &&
       p.status !== "ready" &&
       p.status !== "online"
     );
   },
-  
+
   getPrintersWithLowInk: () => {
     return get().printers.filter(p => p.hasLowInk === true);
   },
-  
+
   getPrintersWithCriticalInk: () => {
     return get().printers.filter(p => p.hasCriticalInk === true);
   },
-  
+
   // Pause/resume printer (jika backend support)
   pausePrinter: async (agentId, printerName) => {
     try {
@@ -157,7 +209,7 @@ export const usePrinterStore = create((set, get) => ({
       throw error;
     }
   },
-  
+
   resumePrinter: async (agentId, printerName) => {
     try {
       const data = await api.resumePrinter(agentId, printerName);
@@ -171,7 +223,7 @@ export const usePrinterStore = create((set, get) => ({
       throw error;
     }
   },
-  
+
   // Reset store
   reset: () => {
     set({

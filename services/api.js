@@ -84,6 +84,10 @@ export const api = {
   getHealth: () => fetchAPI('/api/health'),
   getWebsocketStatus: () => fetchAPI('/api/websocket/status'),
 
+  // GELL ALL PRINTERS
+  getAllPrinters: () =>
+    fetchAPI('/api/printers', {}, false, null),
+
   // ========== COMPANY & DEPARTEMENT - PAKE JWT ==========
   getCompanies: () => fetchAPI('/api/company'),
   getDepartments: (companyId) => fetchAPI(`/api/departement/${companyId}`),
@@ -123,7 +127,7 @@ export const api = {
       body: JSON.stringify(companyData)
     }),
 
-  deleteCompany: (companyId) =>                          
+  deleteCompany: (companyId) =>
     fetchAPI(`/api/company/${companyId}`, {
       method: 'DELETE'
     }),

@@ -1,12 +1,14 @@
-// app/dashboard/page.jsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
+import { usePrinterStore } from "@/store/printer.store";
+import { Badge } from "@/components/ui/badge";
 import Sidebar from "@/components/Sidebar";
 import AgentTable from "@/components/tables/AgentTable";
+import PrinterTable from "@/components/tables/PrinterTable";
 import PrinterCard from "@/components/cards/PrinterCard";
 import StatsCards from "@/components/cards/StatsCard";
 import HealthCard from "@/components/cards/HealthCard";
@@ -14,18 +16,27 @@ import DailyReport from "@/components/cards/DailyReport";
 import CompanyModal from "@/components/company/Management";
 import DepartmentModal from "@/components/company/Departement";
 import DeleteCompanyDialog from "@/components/company/DeleteDialog";
+import PrinterDetailModal from "@/components/modals/PrinterDetailModal";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Printer, AlertCircle, BarChart3, Settings, Building, Users } from "lucide-react";
+import {
+  RefreshCw,
+  Printer,
+  AlertCircle,
+  BarChart3,
+  Settings,
+  Building,
+  Users,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, checkAuth } = useAuthStore();
-  
+
   // ========== APP STORE ==========
   const {
     // State
     agents,
-    printers,
+    printers: appPrinters,
     health,
     companies,
     isLoading,
@@ -39,6 +50,17 @@ export default function DashboardPage() {
     selectedAgent: selectedAgentGetter,
   } = useAppStore();
 
+  // ========== PRINTER STORE ==========
+  const {
+    allPrinters,                    
+    printers: agentPrinters,        
+    setSelectedAgent: setPrinterSelectedAgent,
+    fetchAllAgents: fetchAllPrinterAgents,
+    fetchAllPrinters,                
+    getAllPrintersStatistics,
+    getPrintersByStatus,
+  } = usePrinterStore();
+
   // ========== LOCAL UI STATE ==========
   const [activeTab, setActiveTab] = useState("overview");
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -48,10 +70,37 @@ export default function DashboardPage() {
     companyId: null,
     companyName: ''
   });
+  const [selectedPrinter, setSelectedPrinter] = useState(null);
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ========== GETTERS ==========
   const selectedAgent = selectedAgentGetter();
   const stats = getStats();
+
+  // Untuk Overview tab: pake agentPrinters (printer per agent)
+  const overviewPrinters = agentPrinters;
+
+  // Untuk Printer Management tab: pake allPrinters (semua printer dari database)
+  const allSystemPrinters = allPrinters;
+
+  // Stats untuk overview
+  const overviewPrinterStats = {
+    total: overviewPrinters.length,
+    online: overviewPrinters.filter(p => p.isOnline || p.status === 'READY' || p.status === 'ONLINE').length,
+    offline: overviewPrinters.filter(p => !p.isOnline && p.status !== 'READY' && p.status !== 'ONLINE').length,
+    totalPages: overviewPrinters.reduce((sum, p) => sum + (parseInt(p.pagesToday) || 0), 0)
+  };
+
+  // Stats untuk semua printer (gunakan helper dari store)
+  const allPrintersStats = getAllPrintersStatistics?.() || {
+    total: 0,
+    online: 0,
+    offline: 0,
+    error: 0,
+    printing: 0,
+    byVendor: {}
+  };
 
   // ========== AUTH CHECK ==========
   useEffect(() => {
@@ -60,20 +109,43 @@ export default function DashboardPage() {
       if (!authed) router.push('/login');
     };
     init();
-  }, []);
+  }, [checkAuth, router]);
 
   // ========== INITIAL LOAD ==========
   useEffect(() => {
     if (isAuthenticated) {
-      loadAgents();
-      loadHealth();
-      loadCompanies();
+      const loadInitialData = async () => {
+        try {
+          // Load data sequentially
+          await loadAgents();
+          await loadHealth();
+          await loadCompanies();
+          await fetchAllPrinterAgents(); 
+          await fetchAllPrinters();       
+        } catch (error) {
+          console.error('Failed to load initial data:', error);
+        }
+      };
+
+      loadInitialData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadAgents, loadHealth, loadCompanies, fetchAllPrinterAgents, fetchAllPrinters]);
+
+  // Sync selected agent dengan printer store
+  useEffect(() => {
+    if (selectedAgent) {
+      setPrinterSelectedAgent(selectedAgent.id);
+    }
+  }, [selectedAgent, setPrinterSelectedAgent]);
 
   // ========== HANDLERS ==========
   const handleSelectAgent = async (agentId) => {
-    await selectAgent(agentId);
+    try {
+      await selectAgent(agentId);
+      // Printer store akan otomatis sync lewat useEffect di atas
+    } catch (error) {
+      console.error('Failed to select agent:', error);
+    }
   };
 
   const handleDeleteCompany = (companyId, companyName) => {
@@ -94,12 +166,29 @@ export default function DashboardPage() {
     }
   };
 
-  const refreshAll = () => {
-    loadAgents();
-    loadHealth();
-    loadCompanies();
-    if (selectedAgent) {
-      selectAgent(selectedAgent.id);
+  const handlePrinterClick = (printer) => {
+    setSelectedPrinter(printer);
+    setIsPrinterModalOpen(true);
+  };
+
+  const refreshAll = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        loadAgents(),
+        loadHealth(),
+        loadCompanies(),
+        fetchAllPrinterAgents(),
+        fetchAllPrinters() 
+      ]);
+
+      if (selectedAgent) {
+        await selectAgent(selectedAgent.id);
+      }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -123,7 +212,7 @@ export default function DashboardPage() {
         health={health}
       />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* ========== HEADER ========== */}
           <div className="flex items-center justify-between">
@@ -138,9 +227,17 @@ export default function DashboardPage() {
                 {activeTab === "reports" && "Reports"}
                 {activeTab === "settings" && "Settings"}
               </h1>
-              {selectedAgent && (
+
+              {/* Tampilkan info berbeda tergantung tab */}
+              {activeTab === "overview" && selectedAgent && (
                 <p className="text-sm text-gray-500 mt-1">
                   {selectedAgent.company} • {selectedAgent.name}
+                </p>
+              )}
+
+              {activeTab === "printers" && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Total {allPrintersStats.total} printers across all agents
                 </p>
               )}
             </div>
@@ -149,10 +246,10 @@ export default function DashboardPage() {
               variant="outline"
               size="sm"
               onClick={refreshAll}
-              disabled={isLoading}
+              disabled={isLoading || isRefreshing}
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${isLoading || isRefreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
           </div>
@@ -162,7 +259,7 @@ export default function DashboardPage() {
             <>
               <StatsCards stats={stats} />
               <HealthCard health={health} />
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                 {/* Left Column - Agent Selector & Daily Report */}
                 <div className="lg:col-span-1 space-y-6">
@@ -179,26 +276,35 @@ export default function DashboardPage() {
                       <option value="">-- Choose an agent --</option>
                       {agents.map((agent) => (
                         <option key={agent.id} value={agent.id}>
-                          {agent.name} ({agent.company})
+                          {agent.name} ({agent.company} - {agent.department})
                         </option>
                       ))}
                     </select>
                   </div>
-                  
+
                   {selectedAgent && (
                     <DailyReport agentId={selectedAgent.id} />
                   )}
                 </div>
 
-                {/* Right Column - Printers */}
+                {/* Right Column - Printers (hanya printer untuk agent terpilih) */}
                 <div className="lg:col-span-2">
-                  {printers.length > 0 ? (
+                  {overviewPrinters.length > 0 ? (
                     <div className="space-y-4">
-                      {printers.map((printer) => (
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Printers for {selectedAgent?.name}
+                        </h3>
+                        <Badge variant="outline">
+                          {overviewPrinters.length} printers
+                        </Badge>
+                      </div>
+                      {overviewPrinters.map((printer) => (
                         <PrinterCard
                           key={printer.id || printer.name}
                           printer={printer}
                           agent={selectedAgent}
+                          onClick={() => handlePrinterClick(printer)}
                         />
                       ))}
                     </div>
@@ -217,6 +323,20 @@ export default function DashboardPage() {
             </>
           )}
 
+          {/* ========== PRINTERS TAB ========== */}
+          {activeTab === "printers" && (
+            <>
+              {/* Printer Table dengan semua printer */}
+              <PrinterTable
+                onPrinterSelect={(printer) => {
+                  setSelectedPrinter(printer);
+                  setIsPrinterModalOpen(true);
+                }}
+                selectedPrinterId={selectedPrinter?.id}
+              />
+            </>
+          )}
+
           {/* ========== AGENTS TAB ========== */}
           {activeTab === "agents" && (
             <AgentTable
@@ -224,19 +344,6 @@ export default function DashboardPage() {
               onAgentSelect={handleSelectAgent}
               selectedAgentId={selectedAgent?.id}
             />
-          )}
-
-          {/* ========== PRINTERS TAB ========== */}
-          {activeTab === "printers" && (
-            <div className="bg-white rounded-lg border p-12 text-center">
-              <Printer className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Printer Management
-              </h3>
-              <p className="text-gray-500">
-                Select an agent from the Agents tab to view and manage printers
-              </p>
-            </div>
           )}
 
           {/* ========== COMPANIES TAB ========== */}
@@ -273,7 +380,7 @@ export default function DashboardPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">License ID</th>
+                        <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">ID</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Name</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Email</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Phone</th>
@@ -394,6 +501,12 @@ export default function DashboardPage() {
           onClose={() => setDeleteConfirm({ isOpen: false, companyId: null, companyName: '' })}
           onConfirm={confirmDeleteCompany}
           isLoading={isLoading}
+        />
+
+        <PrinterDetailModal
+          printer={selectedPrinter}
+          isOpen={isPrinterModalOpen}
+          onClose={() => setIsPrinterModalOpen(false)}
         />
       </main>
     </div>

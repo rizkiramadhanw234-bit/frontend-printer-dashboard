@@ -1,4 +1,3 @@
-// components/cards/PrinterCard.jsx
 "use client";
 
 import React, { useState } from "react";

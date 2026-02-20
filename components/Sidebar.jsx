@@ -1,7 +1,7 @@
 // components/Sidebar.jsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   LayoutDashboard,
   Printer,
@@ -12,15 +12,20 @@ import {
   Server,
   LogOut,
   Building,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
+import ListPrinter from "@/components/cards/ListPrinter"; // Import komponen ListPrinter
 
 export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {} }) {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
+  const [showPrinters, setShowPrinters] = useState(false); // State untuk toggle list printer
+  const [selectedPrinter, setSelectedPrinter] = useState(null);
   
   // ✅ SAFE GET SEMUA!
   const serverStatus = health?.status || 'unknown';
@@ -36,13 +41,23 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
   const alertCount = offlineCount + lowInkCount + criticalInkCount;
 
   const handleMenuClick = (key) => {
-    onTabChange(key);  
+    onTabChange(key);
+    // Close printer list when switching tabs (optional)
+    if (key !== 'printers') {
+      setShowPrinters(false);
+    }
   };
 
   const handleLogout = async () => {
     setLoading(true);
     localStorage.removeItem('jwt_token');
     router.push('/login');
+  };
+
+  const handlePrinterSelect = (printer) => {
+    setSelectedPrinter(printer);
+    // Bisa juga navigate ke printer detail atau emit event
+    console.log('Selected printer:', printer);
   };
 
   const menuItems = [
@@ -55,13 +70,12 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
       key: "agents",
       icon: <Users className="h-4 w-4" />,
       label: "Agents",
-      badge: agentTotal,  // ✅ PAKE VARIABLE
+      badge: agentTotal,
     },
     {
       key: "printers",
       icon: <Printer className="h-4 w-4" />,
       label: "Printers",
-      badge: printerTotal,  // ✅ PAKE VARIABLE
     },
     {
       key: "companies",
@@ -72,7 +86,7 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
       key: "alerts",
       icon: <AlertCircle className="h-4 w-4" />,
       label: "Alerts",
-      badge: alertCount,  // ✅ PAKE VARIABLE
+      badge: alertCount,
       badgeVariant: "destructive",
     },
     {
@@ -131,37 +145,41 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 p-3">
-        <div className="space-y-1">
-          {menuItems.map((item) => {
-            const isActive = activeTab === item.key;
-            const badgeCount = item.badge || 0;
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-3">
+          <div className="space-y-1">
+            {menuItems.map((item) => {
+              const isActive = activeTab === item.key;
+              const badgeCount = item.badge || 0;
 
-            return (
-              <Button
-                key={item.key}
-                variant={isActive ? "secondary" : "ghost"}
-                className={`
-                  w-full justify-start gap-2 h-9 px-3 text-sm
-                  ${isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}
-                `}
-                onClick={() => handleMenuClick(item.key)}
-              >
-                <span className={isActive ? "text-gray-900" : "text-gray-500"}>
-                  {item.icon}
-                </span>
-                <span className="flex-1 text-left">{item.label}</span>
-                {badgeCount > 0 && (
-                  <Badge
-                    variant={item.badgeVariant === "destructive" ? "destructive" : "secondary"}
-                    className="text-[10px] h-5 px-1.5 min-w-5"
-                  >
-                    {badgeCount > 99 ? "99+" : badgeCount}
-                  </Badge>
-                )}
-              </Button>
-            );
-          })}
+              return (
+                <Button
+                  key={item.key}
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={`
+                    w-full justify-start gap-2 h-9 px-3 text-sm
+                    ${isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}
+                  `}
+                  onClick={() => handleMenuClick(item.key)}
+                >
+                  <span className={isActive ? "text-gray-900" : "text-gray-500"}>
+                    {item.icon}
+                  </span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {badgeCount > 0 && (
+                    <Badge
+                      variant={item.badgeVariant === "destructive" ? "destructive" : "secondary"}
+                      className="text-[10px] h-5 px-1.5 min-w-5"
+                    >
+                      {badgeCount > 99 ? "99+" : badgeCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+
+         
         </div>
       </div>
 
