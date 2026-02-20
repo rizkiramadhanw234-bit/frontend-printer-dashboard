@@ -38,15 +38,13 @@ import {
   WifiOff,
   Building,
   MapPin,
-  Users,
   Printer,
   RefreshCw,
   ChevronDown,
   ChevronUp,
   Eye,
-  AlertCircle,
 } from "lucide-react";
-import { useAgentStore } from "@/store/agent.store";
+import { useAppStore } from "@/store/agent.store";
 import { usePrinterStore } from "@/store/printer.store";
 
 export default function AgentTable({ onAgentSelect }) {
@@ -58,7 +56,7 @@ export default function AgentTable({ onAgentSelect }) {
     selectAgent,
     getOnlineAgentsCount,
     getOfflineAgentsCount,
-  } = useAgentStore();
+  } = useAppStore();
 
   const { setSelectedAgent } = usePrinterStore();
 
@@ -138,14 +136,14 @@ export default function AgentTable({ onAgentSelect }) {
       <ChevronDown className="h-3 w-3 ml-1" />;
   };
 
-  const getStatusVariant = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'online': return 'default';
-      case 'offline': return 'secondary';
-      case 'error': return 'destructive';
-      default: return 'outline';
-    }
-  };
+  // const getStatusVariant = (status) => {
+  //   switch (status?.toLowerCase()) {
+  //     case 'online': return 'default';
+  //     case 'offline': return 'secondary';
+  //     case 'error': return 'destructive';
+  //     default: return 'outline';
+  //   }
+  // };
 
   return (
     <Card>
@@ -155,7 +153,7 @@ export default function AgentTable({ onAgentSelect }) {
             <Monitor className="h-5 w-5" />
             Agents ({agents.length})
           </CardTitle>
-          
+
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative">
               <Input
@@ -199,15 +197,15 @@ export default function AgentTable({ onAgentSelect }) {
         <div className="text-sm text-muted-foreground flex flex-wrap gap-4">
           <span className="flex items-center gap-1">
             <Wifi className="h-3 w-3 text-green-500" />
-            {getOnlineAgentsCount()} online
+            {getOnlineAgentsCount?.()} online
           </span>
           <span className="flex items-center gap-1">
             <WifiOff className="h-3 w-3 text-gray-400" />
-            {getOfflineAgentsCount()} offline
+            {getOfflineAgentsCount?.()} offline
           </span>
           <span className="flex items-center gap-1">
             <Printer className="h-3 w-3 text-blue-500" />
-            {agents.reduce((sum, agent) => sum + (agent.printerCount || 0), 0)} total printers
+            {(agents || []).reduce((sum, agent) => sum + (agent.printerCount || 0), 0)} total printers
           </span>
         </div>
       </CardHeader>
@@ -283,16 +281,20 @@ export default function AgentTable({ onAgentSelect }) {
                 filteredAgents.map((agent) => {
                   const isSelected = selectedAgentId === agent.agentId;
                   const lastSeen = agent.lastSeen ? new Date(agent.lastSeen) : null;
-                  const timeAgo = lastSeen 
+                  const timeAgo = lastSeen
+                    // eslint-disable-next-line react-hooks/purity
                     ? `${Math.floor((Date.now() - lastSeen.getTime()) / (1000 * 60))}m ago`
                     : "Unknown";
+
+                  console.log('Agent:', agent.agentId, 'Last seen:', timeAgo);
+                  console.log('Agent lastSeen:', agent.lastSeen);
+                  console.log('Agent lastSeen type:', typeof agent.lastSeen);
 
                   return (
                     <TableRow
                       key={agent.agentId}
-                      className={`cursor-pointer hover:bg-muted/50 ${
-                        isSelected ? "bg-blue-50 dark:bg-blue-950/20" : ""
-                      }`}
+                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-blue-50 dark:bg-blue-950/20" : ""
+                        }`}
                       onClick={() => handleSelectAgent(agent.agentId)}
                     >
                       <TableCell>
@@ -300,13 +302,12 @@ export default function AgentTable({ onAgentSelect }) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div
-                                className={`h-3 w-3 rounded-full ${
-                                  agent.status === "online" 
-                                    ? "bg-green-500" 
+                                className={`h-3 w-3 rounded-full ${agent.status === "online"
+                                    ? "bg-green-500"
                                     : agent.status === "offline"
                                       ? "bg-gray-400"
                                       : "bg-red-500"
-                                }`}
+                                  }`}
                               />
                             </TooltipTrigger>
                             <TooltipContent>

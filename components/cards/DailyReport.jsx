@@ -47,7 +47,7 @@ export default function DailyReport({ agentId }) {
       }
     };
 
-    loadReports();
+    // loadReports();
   }, [agentId]);
 
   if (!agentId) {
