@@ -49,7 +49,7 @@ export const useAppStore = create(
         try {
           console.log(`🔑 Fetching API key for ${agentId}...`);
 
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://192.168.18.60:5000"}/api/agents/${agentId}/api-key`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:15000"}/api/agents/${agentId}/api-key`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
               'Content-Type': 'application/json'
@@ -108,7 +108,7 @@ export const useAppStore = create(
           console.log(`🔄 Fetching agent ${agentId} with API key`);
 
           // PAKE FETCH LANGSUNG BIAR GAK RIBET
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://192.168.18.60:5000"}/api/agents/${agentId}`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:15000"}/api/agents/${agentId}`, {
             headers: {
               'Authorization': `Bearer ${agentApiKey}`,
               'Content-Type': 'application/json'

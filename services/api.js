@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://192.168.18.60:5000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:15000";
 
 const getJWTToken = () => {
   const token = localStorage.getItem('jwt_token');

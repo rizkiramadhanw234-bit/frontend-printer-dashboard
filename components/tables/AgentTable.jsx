@@ -44,7 +44,7 @@ import {
   Building2
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.18.60:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function AgentTable({ onAgentSelect, mode = "dashboard" }) {
   const router = useRouter();

@@ -36,7 +36,7 @@ import {
     Activity
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.18.60:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function AgentDetailPage() {
     const params = useParams();

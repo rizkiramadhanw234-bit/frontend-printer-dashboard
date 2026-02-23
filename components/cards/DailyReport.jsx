@@ -11,7 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, FileText } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.18.60:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function DailyReport({ agentId }) {
   const [reports, setReports] = useState([]);
