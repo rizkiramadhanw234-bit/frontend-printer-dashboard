@@ -101,8 +101,18 @@ export const api = {
   getAgent: (agentId) =>
     fetchAPI(`/api/agents/${agentId}`, {}, true, agentId),
 
-  getAgentDailyReports: (agentId) =>
-    fetchAPI(`/api/agents/${agentId}/daily-reports`, {}, true, agentId),
+  getAgentDailyReports: (agentId, params = {}) => {
+    const queryString = new URLSearchParams({
+      page: params.page || 1,
+      limit: params.limit || 30,
+      ...(params.startDate && { startDate: params.startDate }),
+      ...(params.endDate && { endDate: params.endDate })
+    }).toString();
+
+    const endpoint = `/api/agents/${agentId}/daily-reports${queryString ? `?${queryString}` : ''}`;
+
+    return fetchAPI(endpoint, {}, false, agentId);  // false = pake JWT
+  },
 
   // ========== PRINTER CONTROL - PAKE AGENT API KEY ==========
   pausePrinter: (agentId, printerName) =>

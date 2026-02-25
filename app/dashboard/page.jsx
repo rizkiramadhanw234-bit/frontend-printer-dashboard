@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
 import { usePrinterStore } from "@/store/printer.store";
+import { useDailyReportStore } from "@/store/daily.reports";
+import {api} from "@/services/api"
 import { Badge } from "@/components/ui/badge";
 import Sidebar from "@/components/Sidebar";
 import AgentTable from "@/components/tables/AgentTable";
@@ -52,14 +54,21 @@ export default function DashboardPage() {
 
   // ========== PRINTER STORE ==========
   const {
-    allPrinters,                    
-    printers: agentPrinters,        
+    allPrinters,
+    printers: agentPrinters,
     setSelectedAgent: setPrinterSelectedAgent,
     fetchAllAgents: fetchAllPrinterAgents,
-    fetchAllPrinters,                
+    fetchAllPrinters,
     getAllPrintersStatistics,
     getPrintersByStatus,
   } = usePrinterStore();
+
+  // ======daily reports
+  const {
+    reports: dailyReports,
+    summary: dailySummary,
+    fetchAgentReports
+  } = useDailyReportStore();
 
   // ========== LOCAL UI STATE ==========
   const [activeTab, setActiveTab] = useState("overview");
@@ -120,8 +129,8 @@ export default function DashboardPage() {
           await loadAgents();
           await loadHealth();
           await loadCompanies();
-          await fetchAllPrinterAgents(); 
-          await fetchAllPrinters();       
+          await fetchAllPrinterAgents();
+          await fetchAllPrinters();
         } catch (error) {
           console.error('Failed to load initial data:', error);
         }
@@ -137,6 +146,38 @@ export default function DashboardPage() {
       setPrinterSelectedAgent(selectedAgent.id);
     }
   }, [selectedAgent, setPrinterSelectedAgent]);
+
+  // ========== SAVE AGENT API KEY ==========
+  useEffect(() => {
+    const saveAgentApiKey = async () => {
+      if (selectedAgent) {
+        try {
+          // Panggil API untuk dapetin detail agent (yang contains API key)
+          const response = await api.getAgent(selectedAgent.id);
+          const apiKey = response.agent?.apiKey;
+
+          if (apiKey) {
+            // Simpan di app-storage sesuai format yang dibaca getAgentApiKey()
+            const store = JSON.parse(localStorage.getItem('app-storage') || '{}');
+            if (!store.state) store.state = {};
+            if (!store.state.agentsWithKeys) store.state.agentsWithKeys = {};
+            store.state.agentsWithKeys[selectedAgent.id] = apiKey;
+            localStorage.setItem('app-storage', JSON.stringify(store));
+
+            console.log('✅ API Key saved for agent:', selectedAgent.id);
+          } else {
+            console.warn('⚠️ No API key in agent response:', response);
+          }
+        } catch (error) {
+          console.error('Failed to get agent API key:', error);
+        }
+      }
+    };
+
+    if (selectedAgent) {
+      saveAgentApiKey();
+    }
+  }, [selectedAgent]);
 
   // ========== HANDLERS ==========
   const handleSelectAgent = async (agentId) => {
@@ -179,7 +220,7 @@ export default function DashboardPage() {
         loadHealth(),
         loadCompanies(),
         fetchAllPrinterAgents(),
-        fetchAllPrinters() 
+        fetchAllPrinters()
       ]);
 
       if (selectedAgent) {
@@ -463,10 +504,87 @@ export default function DashboardPage() {
 
           {/* ========== REPORTS TAB ========== */}
           {activeTab === "reports" && (
-            <div className="bg-white rounded-lg border p-12 text-center">
-              <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Reports</h3>
-              <p className="text-gray-500">Reports feature coming soon</p>
+            <div className="space-y-6">
+              {/* Header dengan statistik global */}
+              <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Print Reports Overview</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-500">Total Agents</div>
+                    <div className="text-2xl font-bold">{agents.length}</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-500">Total Printers</div>
+                    <div className="text-2xl font-bold">{allPrintersStats.total || 0}</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-500">Active Printers</div>
+                    <div className="text-2xl font-bold">{allPrintersStats.online || 0}</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-500">Companies</div>
+                    <div className="text-2xl font-bold">{companies.length}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Agent Selector untuk Reports */}
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  View Reports by Agent
+                </h3>
+                <select
+                  value={selectedAgent?.id || ""}
+                  onChange={(e) => handleSelectAgent(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select Agent --</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name} ({agent.company})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Daily Reports untuk Agent terpilih (full width) */}
+              {selectedAgent ? (
+                <div className="bg-white rounded-lg border p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Daily Reports: {selectedAgent.name}
+                    </h3>
+                    <Badge variant="outline" className="text-xs">
+                      {selectedAgent.company} - {selectedAgent.department}
+                    </Badge>
+                  </div>
+
+                  {/* DailyReport component dengan limit lebih besar untuk reports tab */}
+                  <DailyReport
+                    agentId={selectedAgent.id}
+                    limit={10}  // Tampilkan lebih banyak di halaman reports
+                    showViewAll={false} // Sembunyikan tombol view all karena sudah full
+                  />
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border p-12 text-center">
+                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Agent</h3>
+                  <p className="text-gray-500">
+                    Choose an agent from the dropdown above to view their daily reports
+                  </p>
+                </div>
+              )}
+
+              {/* Tombol untuk laporan bulanan (future feature) */}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => alert('Monthly reports coming soon!')}>
+                  Monthly Reports
+                </Button>
+                <Button variant="outline" onClick={() => alert('Export feature coming soon!')}>
+                  Export Data
+                </Button>
+              </div>
             </div>
           )}
 

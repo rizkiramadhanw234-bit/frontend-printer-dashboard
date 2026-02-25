@@ -300,6 +300,45 @@ export const useAppStore = create(
           error: null,
           isLoading: false
         });
+      },
+
+      // ========== DAILY REPORTS ==========
+      fetchAgentDailyReports: async (agentId, params = {}) => {
+        try {
+          // Ambil API Key dari storage
+          const agentApiKey = get().agentsWithKeys[agentId];
+          
+          if (!agentApiKey) {
+            throw new Error(`No API key for agent ${agentId}`);
+          }
+
+          const queryString = new URLSearchParams({
+            page: params.page || 1,
+            limit: params.limit || 30,
+            ...(params.startDate && { startDate: params.startDate }),
+            ...(params.endDate && { endDate: params.endDate })
+          }).toString();
+
+          const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:15000"}/api/agents/${agentId}/daily-reports${queryString ? `?${queryString}` : ''}`;
+
+          const res = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${agentApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!res.ok) {
+            throw new Error(`Failed to fetch daily reports: ${res.status}`);
+          }
+
+          const data = await res.json();
+          return data;
+
+        } catch (error) {
+          console.error(`❌ Failed to fetch daily reports for ${agentId}:`, error);
+          throw error;
+        }
       }
     }),
     {
@@ -309,7 +348,8 @@ export const useAppStore = create(
         agents: state.agents,
         agentsWithKeys: state.agentsWithKeys,
         companies: state.companies,
-        departments: state.departments
+        departments: state.departments,
+        printers: state.printers
       })
     }
   )

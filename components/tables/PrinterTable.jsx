@@ -215,21 +215,21 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
           <div className="text-sm text-gray-500">Total Printers</div>
           <div className="text-2xl font-bold">{allPrinters.length}</div>
         </div>
-        <div className="bg-green-50 rounded-lg border border-green-200 p-4">
-          <div className="text-sm text-green-600">Online</div>
-          <div className="text-2xl font-bold text-green-700">{stats.online}</div>
+        <div className="rounded-lg border p-4">
+          <div className="text-sm ">Online</div>
+          <div className="text-2xl font-bold ">{stats.online}</div>
         </div>
-        <div className="bg-red-50 rounded-lg border border-red-200 p-4">
-          <div className="text-sm text-red-600">Offline/Error</div>
-          <div className="text-2xl font-bold text-red-700">{stats.offline + stats.error}</div>
+        <div className="rounded-lg border p-4">
+          <div className="text-sm ">Offline/Error</div>
+          <div className="text-2xl font-bold">{stats.offline + stats.error}</div>
         </div>
-        <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
-          <div className="text-sm text-yellow-600">Low Ink</div>
-          <div className="text-2xl font-bold text-yellow-700">{stats.lowInk}</div>
+        <div className="rounded-lg border p-4">
+          <div className="text-sm">Low Ink</div>
+          <div className="text-2xl font-bold ">{stats.lowInk}</div>
         </div>
-        <div className="bg-orange-50 rounded-lg border border-orange-200 p-4">
-          <div className="text-sm text-orange-600">Critical Ink</div>
-          <div className="text-2xl font-bold text-orange-700">{stats.criticalInk}</div>
+        <div className="rounded-lg border p-4">
+          <div className="text-sm">Critical Ink</div>
+          <div className="text-2xl font-bold">{stats.criticalInk}</div>
         </div>
       </div>
 
