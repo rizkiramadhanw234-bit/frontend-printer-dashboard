@@ -61,11 +61,11 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     if (printer.printer_status_detail === 'no_ink') return 'critical';
     if (printer.printer_status_detail === 'low_ink') return 'low';
 
-    if (printer.low_ink_colors && printer.low_ink_colors.length > 0) {
+    if (printer.lowInkColors && printer.lowInkColors.length > 0) {
       const inkLevels = typeof printer.ink_levels === 'string'
         ? JSON.parse(printer.ink_levels)
         : printer.ink_levels || {};
-      const hasZero = printer.low_ink_colors.some(color => inkLevels[color] === 0);
+      const hasZero = printer.lowInkColors.some(color => inkLevels[color] === 0);
       if (hasZero) return 'critical';
       return 'low';
     }
@@ -222,8 +222,8 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
   };
 
   const getLowInkIndicator = (printer) => {
-    // 🔥 GANTI lowInkColors → low_ink_colors
-    if (!printer.low_ink_colors || printer.low_ink_colors.length === 0) return null;
+    // 🔥 GANTI lowInkColors → lowInkColors
+    if (!printer.lowInkColors || printer.lowInkColors.length === 0) return null;
 
     const criticalColors = [];
     const lowColors = [];
@@ -233,8 +233,8 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
       ? JSON.parse(printer.ink_levels)
       : printer.ink_levels || {};
 
-    // 🔥 GANTI lowInkColors → low_ink_colors
-    printer.low_ink_colors.forEach(color => {
+    // 🔥 GANTI lowInkColors → lowInkColors
+    printer.lowInkColors.forEach(color => {
       const level = inkLevels[color] || 0;
       if (level === 0) {
         criticalColors.push(color);

@@ -74,8 +74,8 @@ export const useAlertStore = create(
 
                     // ========== ALERT 1: NO INK / CRITICAL INK ==========
                     if (printer.printer_status_detail === 'no_ink' ||
-                        (printer.low_ink_colors && printer.low_ink_colors.length > 0 &&
-                            printer.low_ink_colors.some(color => {
+                        (printer.lowInkColors && printer.lowInkColors.length > 0 &&
+                            printer.lowInkColors.some(color => {
                                 // Parse ink_levels karena bisa string JSON
                                 const inkLevels = typeof printer.ink_levels === 'string'
                                     ? JSON.parse(printer.ink_levels)
@@ -83,7 +83,7 @@ export const useAlertStore = create(
                                 return inkLevels[color] === 0;
                             }))) {
 
-                        const colors = printer.low_ink_colors?.join(', ') || 'ink';
+                        const colors = printer.lowInkColors?.join(', ') || 'ink';
                         const existingNoInk = existingAlerts.find(a => a.type === 'no_ink');
 
                         if (!existingNoInk) {
@@ -96,7 +96,7 @@ export const useAlertStore = create(
                                 severity: 'critical',
                                 message: `${printerName}: No ink (${colors})`,
                                 details: {
-                                    colors: printer.low_ink_colors,
+                                    colors: printer.lowInkColors,
                                     inkLevels: printer.ink_levels
                                 },
                                 timestamp: now,
@@ -109,9 +109,9 @@ export const useAlertStore = create(
 
                     // ========== ALERT 2: LOW INK ==========
                     else if (printer.printer_status_detail === 'low_ink' ||
-                        (printer.low_ink_colors && printer.low_ink_colors.length > 0)) {
+                        (printer.lowInkColors && printer.lowInkColors.length > 0)) {
 
-                        const colors = printer.low_ink_colors?.join(', ') || 'ink';
+                        const colors = printer.lowInkColors?.join(', ') || 'ink';
                         const existingLowInk = existingAlerts.find(a => a.type === 'low_ink');
 
                         if (!existingLowInk) {
@@ -124,7 +124,7 @@ export const useAlertStore = create(
                                 severity: 'warning',
                                 message: `${printerName}: Low ink (${colors})`,
                                 details: {
-                                    colors: printer.low_ink_colors,
+                                    colors: printer.lowInkColors,
                                     inkLevels: printer.ink_levels
                                 },
                                 timestamp: now,

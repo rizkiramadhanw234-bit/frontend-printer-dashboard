@@ -209,8 +209,7 @@ export const usePrinterStore = create((set, get) => ({
 
     getPrintersWithLowInk: () => {
         return get().allPrinters.filter(p => {
-            // 🔥 PAKAI snake_case!
-            if (p.low_ink_colors && p.low_ink_colors.length > 0) return true;
+            if (p.lowInkColors && p.lowInkColors.length > 0) return true;
 
             if (!p.ink_levels) return false;
 
@@ -227,7 +226,6 @@ export const usePrinterStore = create((set, get) => ({
 
     getPrintersWithCriticalInk: () => {
         return get().allPrinters.filter(p => {
-            // 🔥 PAKAI snake_case!
             if (p.printer_status_detail === 'no_ink') return true;
 
             if (!p.ink_levels) return false;
@@ -267,12 +265,12 @@ export const usePrinterStore = create((set, get) => ({
         // 🔥 HITUNG LOW INK - PAKAI snake_case!
         const lowInk = printers.filter(p => {
             if (p.printer_status_detail === 'low_ink') return true;
-            if (p.low_ink_colors && p.low_ink_colors.length > 0) {
+            if (p.lowInkColors && p.lowInkColors.length > 0) {
                 // Parse ink_levels dulu
                 const inkLevels = typeof p.ink_levels === 'string'
                     ? JSON.parse(p.ink_levels)
                     : p.ink_levels || {};
-                const hasZero = p.low_ink_colors.some(color => inkLevels[color] === 0);
+                const hasZero = p.lowInkColors.some(color => inkLevels[color] === 0);
                 if (!hasZero) return true;
             }
             return false;
@@ -288,8 +286,8 @@ export const usePrinterStore = create((set, get) => ({
 
             if (Object.values(inkLevels).some(v => v === 0)) return true;
 
-            if (p.low_ink_colors && p.low_ink_colors.length > 0) {
-                const hasZero = p.low_ink_colors.some(color => inkLevels[color] === 0);
+            if (p.lowInkColors && p.lowInkColors.length > 0) {
+                const hasZero = p.lowInkColors.some(color => inkLevels[color] === 0);
                 if (hasZero) return true;
             }
 
