@@ -1,3 +1,4 @@
+// app/(routes)/dashboard/page.jsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
 import { usePrinterStore } from "@/store/printer.store";
-import { useDailyReportStore } from "@/store/daily.reports";
-import {api} from "@/services/api"
-import { Badge } from "@/components/ui/badge";
+import { useReportStore } from "@/store/report.store";
+import { useStatsStore } from "@/store/stats.store";
+import { useSystemStore } from "@/store/system.store";
+import { useAlertStore } from "@/store/alert.store";
 import Sidebar from "@/components/Sidebar";
 import AgentTable from "@/components/tables/AgentTable";
 import PrinterTable from "@/components/tables/PrinterTable";
@@ -19,7 +21,7 @@ import CompanyModal from "@/components/company/Management";
 import DepartmentModal from "@/components/company/Departement";
 import DeleteCompanyDialog from "@/components/company/DeleteDialog";
 import PrinterDetailModal from "@/components/modals/PrinterDetailModal";
-import { Button } from "@/components/ui/button";
+import AlertCard from "@/components/cards/AlertCard";
 import {
   RefreshCw,
   Printer,
@@ -28,49 +30,66 @@ import {
   Settings,
   Building,
   Users,
+  Bell,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, checkAuth } = useAuthStore();
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // ========== APP STORE ==========
+  // APP STORE
   const {
-    // State
     agents,
-    printers: appPrinters,
-    health,
     companies,
-    isLoading,
-    // Actions
+    isLoading: appLoading,
     loadAgents,
-    loadHealth,
     loadCompanies,
     selectAgent,
     deleteCompany,
-    getStats,
     selectedAgent: selectedAgentGetter,
   } = useAppStore();
 
-  // ========== PRINTER STORE ==========
+  // PRINTER STORE
   const {
     allPrinters,
-    printers: agentPrinters,
-    setSelectedAgent: setPrinterSelectedAgent,
-    fetchAllAgents: fetchAllPrinterAgents,
+    agentPrinters,
     fetchAllPrinters,
+    fetchAgentPrinters,
     getAllPrintersStatistics,
-    getPrintersByStatus,
   } = usePrinterStore();
 
-  // ======daily reports
+  // STATS STORE
   const {
-    reports: dailyReports,
-    summary: dailySummary,
-    fetchAgentReports
-  } = useDailyReportStore();
+    agentStats,
+    fetchAgentStats,
+    fetchPrintStats,
+  } = useStatsStore();
 
-  // ========== LOCAL UI STATE ==========
+  // SYSTEM STORE
+  const {
+    health,
+    fetchHealth,
+    fetchSystemInfo,
+  } = useSystemStore();
+
+  // REPORT STORE
+  const {
+    dailyReport,
+    fetchDailyReportToday,
+  } = useReportStore();
+
+  // ALERT STORE
+  const {
+    alerts,
+    unreadCount,
+    generateAlertsFromPrinters,
+    initWebSocket,
+    cleanup,
+    markAllAsRead
+  } = useAlertStore();
+
+  // LOCAL UI STATE
   const [activeTab, setActiveTab] = useState("overview");
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
@@ -82,55 +101,67 @@ export default function DashboardPage() {
   const [selectedPrinter, setSelectedPrinter] = useState(null);
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
 
-  // ========== GETTERS ==========
-  const selectedAgent = selectedAgentGetter();
-  const stats = getStats();
+  // GETTERS
+  const selectedAgent = agents.find(a => a.id === selectedAgentId);
+  const overviewPrinters = selectedAgent ? (agentPrinters[selectedAgentId] || []) : [];
 
-  // Untuk Overview tab: pake agentPrinters (printer per agent)
-  const overviewPrinters = agentPrinters;
-
-  // Untuk Printer Management tab: pake allPrinters (semua printer dari database)
-  const allSystemPrinters = allPrinters;
-
-  // Stats untuk overview
-  const overviewPrinterStats = {
-    total: overviewPrinters.length,
-    online: overviewPrinters.filter(p => p.isOnline || p.status === 'READY' || p.status === 'ONLINE').length,
-    offline: overviewPrinters.filter(p => !p.isOnline && p.status !== 'READY' && p.status !== 'ONLINE').length,
-    totalPages: overviewPrinters.reduce((sum, p) => sum + (parseInt(p.pagesToday) || 0), 0)
-  };
-
-  // Stats untuk semua printer (gunakan helper dari store)
+  // Stats dari printer store
   const allPrintersStats = getAllPrintersStatistics?.() || {
     total: 0,
     online: 0,
     offline: 0,
     error: 0,
     printing: 0,
-    byVendor: {}
+    lowInk: 0,
+    criticalInk: 0,
+    totalPagesToday: 0
   };
 
-  // ========== AUTH CHECK ==========
+  // Stats untuk cards
+  const stats = {
+    total: allPrintersStats.total,
+    online: allPrintersStats.online,
+    offline: allPrintersStats.offline + allPrintersStats.error,
+    lowInk: allPrintersStats.lowInk,
+    criticalInk: allPrintersStats.criticalInk,
+    pagesToday: allPrintersStats.totalPagesToday
+  };
+
+
+  // AUTH CHECK
   useEffect(() => {
     const init = async () => {
       const authed = await checkAuth();
+      setIsInitialized(true);
       if (!authed) router.push('/login');
     };
     init();
   }, [checkAuth, router]);
 
-  // ========== INITIAL LOAD ==========
+  // INITIAL LOAD
   useEffect(() => {
     if (isAuthenticated) {
       const loadInitialData = async () => {
         try {
-          // Load data sequentially
-          await loadAgents();
-          await loadHealth();
-          await loadCompanies();
-          await fetchAllPrinterAgents();
-          await fetchAllPrinters();
+          await Promise.all([
+            loadAgents(),
+            loadCompanies(),
+            fetchHealth(),
+            fetchSystemInfo(),
+            fetchAllPrinters(),
+            fetchAgentStats(),
+            fetchPrintStats()
+          ]);
+
+          const stats = getAllPrintersStatistics();
+
+
+          if (allPrinters.length > 0) {
+            generateAlertsFromPrinters(allPrinters, 'initial');
+          }
         } catch (error) {
           console.error('Failed to load initial data:', error);
         }
@@ -138,52 +169,58 @@ export default function DashboardPage() {
 
       loadInitialData();
     }
-  }, [isAuthenticated, loadAgents, loadHealth, loadCompanies, fetchAllPrinterAgents, fetchAllPrinters]);
+  }, [isAuthenticated]);
 
-  // Sync selected agent dengan printer store
   useEffect(() => {
-    if (selectedAgent) {
-      setPrinterSelectedAgent(selectedAgent.id);
-    }
-  }, [selectedAgent, setPrinterSelectedAgent]);
+    console.log('🔄 allPrinters BERUBAH:', {
+      length: allPrinters.length,
+      data: allPrinters,
+      firstPrinter: allPrinters[0]
+    });
 
-  // ========== SAVE AGENT API KEY ==========
+    if (allPrinters.length > 0) {
+      console.log('📋 SEMUA PROPERTI PRINTER:', Object.keys(allPrinters[0]));
+      console.log('📋 VALUE PRINTER:', JSON.stringify(allPrinters[0], null, 2));
+
+      console.log('   printerStatusDetail:', allPrinters[0]?.printerStatusDetail);
+      console.log('   lowInkColors:', allPrinters[0]?.lowInkColors);
+      console.log('   printer_status_detail:', allPrinters[0]?.printer_status_detail);
+      console.log('   low_ink_colors:', allPrinters[0]?.low_ink_colors);
+
+
+      const stats = getAllPrintersStatistics();
+      console.log('📊 stats setelah update:', stats);
+    }
+  }, [allPrinters]);
+
+
+  // Generate alerts when printers update
   useEffect(() => {
-    const saveAgentApiKey = async () => {
-      if (selectedAgent) {
-        try {
-          // Panggil API untuk dapetin detail agent (yang contains API key)
-          const response = await api.getAgent(selectedAgent.id);
-          const apiKey = response.agent?.apiKey;
-
-          if (apiKey) {
-            // Simpan di app-storage sesuai format yang dibaca getAgentApiKey()
-            const store = JSON.parse(localStorage.getItem('app-storage') || '{}');
-            if (!store.state) store.state = {};
-            if (!store.state.agentsWithKeys) store.state.agentsWithKeys = {};
-            store.state.agentsWithKeys[selectedAgent.id] = apiKey;
-            localStorage.setItem('app-storage', JSON.stringify(store));
-
-            console.log('✅ API Key saved for agent:', selectedAgent.id);
-          } else {
-            console.warn('⚠️ No API key in agent response:', response);
-          }
-        } catch (error) {
-          console.error('Failed to get agent API key:', error);
-        }
-      }
-    };
-
-    if (selectedAgent) {
-      saveAgentApiKey();
+    if (allPrinters.length > 0 && isAuthenticated) {
+      generateAlertsFromPrinters(allPrinters, 'printer_update');
     }
-  }, [selectedAgent]);
+  }, [allPrinters, isAuthenticated, generateAlertsFromPrinters]);
 
-  // ========== HANDLERS ==========
+  // Fetch agent printers when agent selected
+  useEffect(() => {
+    if (selectedAgentId) {
+      fetchAgentPrinters(selectedAgentId);
+      fetchDailyReportToday(selectedAgentId);
+    }
+  }, [selectedAgentId, fetchAgentPrinters, fetchDailyReportToday]);
+
+  // Auto-select first agent
+  useEffect(() => {
+    if (agents.length > 0 && !selectedAgentId) {
+      setSelectedAgentId(agents[0].id);
+    }
+  }, [agents, selectedAgentId]);
+
+  // HANDLERS
   const handleSelectAgent = async (agentId) => {
     try {
+      setSelectedAgentId(agentId);
       await selectAgent(agentId);
-      // Printer store akan otomatis sync lewat useEffect di atas
     } catch (error) {
       console.error('Failed to select agent:', error);
     }
@@ -199,9 +236,9 @@ export default function DashboardPage() {
 
     try {
       await deleteCompany(companyId);
-      alert(`✅ Company "${companyName}" deleted successfully`);
+      alert(`Company "${companyName}" deleted successfully`);
     } catch (error) {
-      alert(`❌ Failed to delete company: ${error.message}`);
+      alert(`Failed to delete company: ${error.message}`);
     } finally {
       setDeleteConfirm({ isOpen: false, companyId: null, companyName: '' });
     }
@@ -217,14 +254,21 @@ export default function DashboardPage() {
     try {
       await Promise.all([
         loadAgents(),
-        loadHealth(),
         loadCompanies(),
-        fetchAllPrinterAgents(),
-        fetchAllPrinters()
+        fetchHealth(),
+        fetchSystemInfo(),
+        fetchAllPrinters(),
+        fetchAgentStats(),
+        fetchPrintStats()
       ]);
 
-      if (selectedAgent) {
-        await selectAgent(selectedAgent.id);
+      if (selectedAgentId) {
+        await fetchAgentPrinters(selectedAgentId);
+        await fetchDailyReportToday(selectedAgentId);
+      }
+
+      if (allPrinters.length > 0) {
+        generateAlertsFromPrinters(allPrinters, 'refresh');
       }
     } catch (error) {
       console.error('Refresh failed:', error);
@@ -233,7 +277,11 @@ export default function DashboardPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  const handleMarkAllAlertsRead = () => {
+    markAllAsRead();
+  };
+
+  if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -255,7 +303,7 @@ export default function DashboardPage() {
 
       <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* ========== HEADER ========== */}
+          {/* HEADER */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
@@ -269,7 +317,6 @@ export default function DashboardPage() {
                 {activeTab === "settings" && "Settings"}
               </h1>
 
-              {/* Tampilkan info berbeda tergantung tab */}
               {activeTab === "overview" && selectedAgent && (
                 <p className="text-sm text-gray-500 mt-1">
                   {selectedAgent.company} • {selectedAgent.name}
@@ -281,25 +328,82 @@ export default function DashboardPage() {
                   Total {allPrintersStats.total} printers across all agents
                 </p>
               )}
+
+              {activeTab === "alerts" && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {unreadCount} unread • {alerts.length} active alerts
+                </p>
+              )}
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshAll}
-              disabled={isLoading || isRefreshing}
-              className="gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading || isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {activeTab === "alerts" && unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAlertsRead}
+                  className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Bell className="h-4 w-4" />
+                  Mark all read
+                </button>
+              )}
+              <button
+                onClick={refreshAll}
+                disabled={appLoading || isRefreshing}
+                className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${appLoading || isRefreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
           </div>
 
-          {/* ========== OVERVIEW TAB ========== */}
+          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <>
               <StatsCards stats={stats} />
-              <HealthCard health={health} />
+
+              {/* Quick Alert Summary */}
+              {alerts.length > 0 && (
+                <div className="bg-white rounded-lg border p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-500" />
+                      <h3 className="font-medium">Active Alerts</h3>
+                      <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                        {alerts.length}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("alerts")}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {alerts.slice(0, 3).map(alert => (
+                      <div
+                        key={alert.id}
+                        className="text-sm p-2 bg-gray-50 rounded flex items-center gap-2 cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          setSelectedAlert(alert);
+                          setActiveTab("alerts");
+                        }}
+                      >
+                        {alert.severity === 'critical' ? (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        )}
+                        <span className="flex-1 truncate">{alert.message}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(alert.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                 {/* Left Column - Agent Selector & Daily Report */}
@@ -309,10 +413,10 @@ export default function DashboardPage() {
                       Select Agent
                     </h3>
                     <select
-                      value={selectedAgent?.id || ""}
+                      value={selectedAgentId || ""}
                       onChange={(e) => handleSelectAgent(e.target.value)}
                       className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      disabled={isLoading}
+                      disabled={appLoading}
                     >
                       <option value="">-- Choose an agent --</option>
                       {agents.map((agent) => (
@@ -323,12 +427,12 @@ export default function DashboardPage() {
                     </select>
                   </div>
 
-                  {selectedAgent && (
-                    <DailyReport agentId={selectedAgent.id} />
+                  {selectedAgentId && (
+                    <DailyReport agentId={selectedAgentId} />
                   )}
                 </div>
 
-                {/* Right Column - Printers (hanya printer untuk agent terpilih) */}
+                {/* Right Column - Printers */}
                 <div className="lg:col-span-2">
                   {overviewPrinters.length > 0 ? (
                     <div className="space-y-4">
@@ -336,9 +440,9 @@ export default function DashboardPage() {
                         <h3 className="text-sm font-medium text-gray-700">
                           Printers for {selectedAgent?.name}
                         </h3>
-                        <Badge variant="outline">
+                        <span className="px-2 py-1 border rounded text-xs">
                           {overviewPrinters.length} printers
-                        </Badge>
+                        </span>
                       </div>
                       {overviewPrinters.map((printer) => (
                         <PrinterCard
@@ -364,30 +468,27 @@ export default function DashboardPage() {
             </>
           )}
 
-          {/* ========== PRINTERS TAB ========== */}
+          {/* PRINTERS TAB */}
           {activeTab === "printers" && (
-            <>
-              {/* Printer Table dengan semua printer */}
-              <PrinterTable
-                onPrinterSelect={(printer) => {
-                  setSelectedPrinter(printer);
-                  setIsPrinterModalOpen(true);
-                }}
-                selectedPrinterId={selectedPrinter?.id}
-              />
-            </>
+            <PrinterTable
+              onPrinterSelect={(printer) => {
+                setSelectedPrinter(printer);
+                setIsPrinterModalOpen(true);
+              }}
+              selectedPrinterId={selectedPrinter?.id}
+            />
           )}
 
-          {/* ========== AGENTS TAB ========== */}
+          {/* AGENTS TAB */}
           {activeTab === "agents" && (
             <AgentTable
               mode="dashboard"
               onAgentSelect={handleSelectAgent}
-              selectedAgentId={selectedAgent?.id}
+              selectedAgentId={selectedAgentId}
             />
           )}
 
-          {/* ========== COMPANIES TAB ========== */}
+          {/* COMPANIES TAB */}
           {activeTab === "companies" && (
             <div className="bg-white rounded-lg border">
               <div className="p-6 border-b flex justify-between items-center">
@@ -398,21 +499,20 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
+                  <button
                     onClick={() => setIsCompanyModalOpen(true)}
-                    className="gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
                   >
                     <Building className="h-4 w-4" />
                     Add Company
-                  </Button>
-                  <Button
-                    variant="outline"
+                  </button>
+                  <button
                     onClick={() => setIsDepartmentModalOpen(true)}
-                    className="gap-2"
+                    className="px-4 py-2 border rounded-md hover:bg-gray-50 flex items-center gap-2"
                   >
                     <Users className="h-4 w-4" />
                     Departments
-                  </Button>
+                  </button>
                 </div>
               </div>
 
@@ -421,7 +521,7 @@ export default function DashboardPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">ID</th>
+                        <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">License Key</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Name</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Email</th>
                         <th className="px-4 py-3 text-left text-xs text-gray-500 uppercase">Phone</th>
@@ -433,7 +533,7 @@ export default function DashboardPage() {
                       {companies.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                            No companies found. Click &quot;Add Company&quot; to create one.
+                            No companies found. Click "Add Company" to create one.
                           </td>
                         </tr>
                       ) : (
@@ -455,16 +555,14 @@ export default function DashboardPage() {
                               {company.address || '-'}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              <button
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
                                 onClick={() => handleDeleteCompany(company.id, company.name)}
                               >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                              </Button>
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -476,7 +574,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ========== DEPARTMENTS TAB ========== */}
+          {/* DEPARTMENTS TAB */}
           {activeTab === "departments" && (
             <div className="bg-white rounded-lg border p-12 text-center">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -486,23 +584,25 @@ export default function DashboardPage() {
               <p className="text-gray-500 mb-4">
                 Click the button below to manage departments
               </p>
-              <Button onClick={() => setIsDepartmentModalOpen(true)} className="gap-2">
+              <button
+                onClick={() => setIsDepartmentModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center gap-2"
+              >
                 <Users className="h-4 w-4" />
                 Open Department Manager
-              </Button>
+              </button>
             </div>
           )}
 
-          {/* ========== ALERTS TAB ========== */}
+          {/* ALERTS TAB */}
           {activeTab === "alerts" && (
-            <div className="bg-white rounded-lg border p-12 text-center">
-              <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Alerts</h3>
-              <p className="text-gray-500">All systems are operating normally</p>
-            </div>
+            <AlertCard
+              onAlertSelect={(alert) => setSelectedAlert(alert)}
+              selectedAlertId={selectedAlert?.id}
+            />
           )}
 
-          {/* ========== REPORTS TAB ========== */}
+          {/* REPORTS TAB */}
           {activeTab === "reports" && (
             <div className="space-y-6">
               {/* Header dengan statistik global */}
@@ -534,7 +634,7 @@ export default function DashboardPage() {
                   View Reports by Agent
                 </h3>
                 <select
-                  value={selectedAgent?.id || ""}
+                  value={selectedAgentId || ""}
                   onChange={(e) => handleSelectAgent(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 >
@@ -547,23 +647,22 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* Daily Reports untuk Agent terpilih (full width) */}
+              {/* Daily Reports untuk Agent terpilih */}
               {selectedAgent ? (
                 <div className="bg-white rounded-lg border p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-gray-900">
                       Daily Reports: {selectedAgent.name}
                     </h3>
-                    <Badge variant="outline" className="text-xs">
+                    <span className="px-2 py-1 border rounded text-xs">
                       {selectedAgent.company} - {selectedAgent.department}
-                    </Badge>
+                    </span>
                   </div>
 
-                  {/* DailyReport component dengan limit lebih besar untuk reports tab */}
                   <DailyReport
-                    agentId={selectedAgent.id}
-                    limit={10}  // Tampilkan lebih banyak di halaman reports
-                    showViewAll={false} // Sembunyikan tombol view all karena sudah full
+                    agentId={selectedAgentId}
+                    limit={10}
+                    showViewAll={false}
                   />
                 </div>
               ) : (
@@ -576,19 +675,24 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Tombol untuk laporan bulanan (future feature) */}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => alert('Monthly reports coming soon!')}>
+                <button
+                  onClick={() => alert('Monthly reports coming soon!')}
+                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                >
                   Monthly Reports
-                </Button>
-                <Button variant="outline" onClick={() => alert('Export feature coming soon!')}>
+                </button>
+                <button
+                  onClick={() => alert('Export feature coming soon!')}
+                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                >
                   Export Data
-                </Button>
+                </button>
               </div>
             </div>
           )}
 
-          {/* ========== SETTINGS TAB ========== */}
+          {/* SETTINGS TAB */}
           {activeTab === "settings" && (
             <div className="bg-white rounded-lg border p-12 text-center">
               <Settings className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -598,7 +702,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ========== MODALS ========== */}
+        {/* MODALS */}
         <CompanyModal
           isOpen={isCompanyModalOpen}
           onClose={() => setIsCompanyModalOpen(false)}
@@ -618,7 +722,7 @@ export default function DashboardPage() {
           companyName={deleteConfirm.companyName}
           onClose={() => setDeleteConfirm({ isOpen: false, companyId: null, companyName: '' })}
           onConfirm={confirmDeleteCompany}
-          isLoading={isLoading}
+          isLoading={appLoading}
         />
 
         <PrinterDetailModal

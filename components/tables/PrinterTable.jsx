@@ -47,7 +47,6 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Helper function untuk parse ink levels
   const parseInkLevels = (inkLevels) => {
     if (!inkLevels) return {};
     try {
@@ -59,13 +58,37 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
 
   // Cek kondisi ink
   const getInkStatus = (printer) => {
-    const inkLevels = parseInkLevels(printer.ink_levels);
-    const values = Object.values(inkLevels);
+    if (printer.printer_status_detail === 'no_ink') return 'critical';
+    if (printer.printer_status_detail === 'low_ink') return 'low';
 
+    if (printer.low_ink_colors && printer.low_ink_colors.length > 0) {
+      const inkLevels = typeof printer.ink_levels === 'string'
+        ? JSON.parse(printer.ink_levels)
+        : printer.ink_levels || {};
+      const hasZero = printer.low_ink_colors.some(color => inkLevels[color] === 0);
+      if (hasZero) return 'critical';
+      return 'low';
+    }
+
+    const inkLevels = parseInkLevels(printer.ink_levels);
+    const values = Object.values(inkLevels).filter(v => v !== null && v !== undefined);
+
+    if (values.some(v => v === 0)) return 'critical';
     if (values.some(v => v > 0 && v < 15)) return 'critical';
-    if (values.some(v => v > 0 && v < 30)) return 'low';
+    if (values.some(v => v >= 15 && v < 30)) return 'low';
     if (values.length > 0) return 'normal';
+
     return 'unknown';
+  };
+
+  // Dapatkan status detail dari printer
+  const getDetailedStatus = (printer) => {
+    // Prioritaskan printerStatusDetail dari backend
+    if (printer.printer_status_detail && printer.printer_status_detail !== 'unknown') {
+      return printer.printer_status_detail;
+    }
+    // Fallback ke status lama
+    return printer.status?.toLowerCase() || 'unknown';
   };
 
   // Dapatkan daftar vendor unik untuk filter
@@ -86,18 +109,23 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
         printer.ip_address?.includes(searchTerm) ||
         printer.agent_id?.toLowerCase().includes(searchLower);
 
-      // Status filter
+      // Status filter dengan detail status
+      const detailedStatus = getDetailedStatus(printer);
       const printerStatus = printer.status?.toUpperCase();
+
       let matchesStatus = true;
       if (statusFilter !== "all") {
         if (statusFilter === "online") {
           matchesStatus = printerStatus === 'READY' || printerStatus === 'ONLINE' || printerStatus === 'PRINTING';
         } else if (statusFilter === "offline") {
-          matchesStatus = printerStatus === 'OFFLINE';
+          matchesStatus = printerStatus === 'OFFLINE' || detailedStatus === 'offline';
         } else if (statusFilter === "error") {
-          matchesStatus = printerStatus === 'OTHER' || printerStatus === 'ERROR';
+          matchesStatus = printerStatus === 'OTHER' || printerStatus === 'ERROR' || detailedStatus === 'error_other';
         } else if (statusFilter === "paused") {
-          matchesStatus = printerStatus === 'PAUSED';
+          matchesStatus = printerStatus === 'PAUSED' || detailedStatus === 'paused';
+        } else {
+          // Filter berdasarkan detailed status
+          matchesStatus = detailedStatus === statusFilter;
         }
       }
 
@@ -140,8 +168,38 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     return { online, offline, error, lowInk, criticalInk };
   }, [allPrinters]);
 
+  // Status options untuk dropdown (untuk pengembangan ke depan)
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'printing', label: 'Printing' },
+    { value: 'offline', label: 'Offline' },
+    { value: 'paused', label: 'Paused' },
+    { value: 'paper_jam', label: 'Paper Jam' },
+    { value: 'out_of_paper', label: 'Out of Paper' },
+    { value: 'door_open', label: 'Door Open' },
+    { value: 'low_ink', label: 'Low Ink' },
+    { value: 'no_ink', label: 'No Ink' },
+    { value: 'error', label: 'Error' },
+  ];
+
   const getStatusIcon = (printer) => {
     const inkStatus = getInkStatus(printer);
+    const detailedStatus = getDetailedStatus(printer);
+
+    // Prioritaskan icon berdasarkan ink status
+    if (inkStatus === 'critical' || detailedStatus === 'no_ink') {
+      return <Droplets className="h-4 w-4 text-red-500" />;
+    }
+
+    if (inkStatus === 'low' || detailedStatus === 'low_ink') {
+      return <Droplets className="h-4 w-4 text-yellow-500" />;
+    }
+
+    // Prioritaskan icon berdasarkan detailed status
+    if (detailedStatus === 'paper_jam' || detailedStatus === 'out_of_paper' || detailedStatus === 'door_open') {
+      return <AlertCircle className="h-4 w-4 text-red-500" />;
+    }
 
     if (inkStatus === 'critical') {
       return <Droplets className="h-4 w-4 text-red-500" />;
@@ -154,39 +212,51 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     if (status === 'READY' || status === 'ONLINE' || status === 'PRINTING') {
       return <Wifi className="h-4 w-4 text-green-500" />;
     }
-    if (status === 'PAUSED') {
+    if (status === 'PAUSED' || detailedStatus === 'paused') {
       return <PauseCircle className="h-4 w-4 text-yellow-500" />;
     }
-    if (status === 'OTHER' || status === 'ERROR') {
+    if (status === 'OTHER' || status === 'ERROR' || detailedStatus === 'error_other') {
       return <AlertCircle className="h-4 w-4 text-orange-500" />;
     }
     return <WifiOff className="h-4 w-4 text-gray-400" />;
   };
 
-  const getStatusBadge = (printer) => {
-    const inkStatus = getInkStatus(printer);
+  const getLowInkIndicator = (printer) => {
+    // 🔥 GANTI lowInkColors → low_ink_colors
+    if (!printer.low_ink_colors || printer.low_ink_colors.length === 0) return null;
 
-    if (inkStatus === 'critical') {
-      return <Badge variant="destructive" className="text-xs">Critical Ink</Badge>;
-    }
-    if (inkStatus === 'low') {
-      return <Badge variant="warning" className="text-xs bg-yellow-100 text-yellow-800">Low Ink</Badge>;
-    }
+    const criticalColors = [];
+    const lowColors = [];
 
-    const status = printer.status?.toUpperCase();
-    if (status === 'READY' || status === 'ONLINE') {
-      return <Badge variant="default" className="text-xs bg-green-100 text-green-800">Ready</Badge>;
-    }
-    if (status === 'PRINTING') {
-      return <Badge variant="default" className="text-xs bg-blue-100 text-blue-800">Printing</Badge>;
-    }
-    if (status === 'PAUSED') {
-      return <Badge variant="secondary" className="text-xs">Paused</Badge>;
-    }
-    if (status === 'OTHER' || status === 'ERROR') {
-      return <Badge variant="destructive" className="text-xs">Error</Badge>;
-    }
-    return <Badge variant="secondary" className="text-xs">Offline</Badge>;
+    // 🔥 Parse ink_levels karena bisa string JSON
+    const inkLevels = typeof printer.ink_levels === 'string'
+      ? JSON.parse(printer.ink_levels)
+      : printer.ink_levels || {};
+
+    // 🔥 GANTI lowInkColors → low_ink_colors
+    printer.low_ink_colors.forEach(color => {
+      const level = inkLevels[color] || 0;
+      if (level === 0) {
+        criticalColors.push(color);
+      } else {
+        lowColors.push(color);
+      }
+    });
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {criticalColors.map(color => (
+          <Badge key={color} variant="destructive" className="text-xs">
+            {color} empty
+          </Badge>
+        ))}
+        {lowColors.map(color => (
+          <Badge key={color} variant="warning" className="text-xs bg-yellow-100 text-yellow-800">
+            {color} low
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   const formatLastSeen = (lastSeen) => {
@@ -211,25 +281,25 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg border p-4">
+        <div className="rounded-lg border p-4">
           <div className="text-sm text-gray-500">Total Printers</div>
           <div className="text-2xl font-bold">{allPrinters.length}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-sm ">Online</div>
-          <div className="text-2xl font-bold ">{stats.online}</div>
+          <div className="text-sm text-gray-500">Online</div>
+          <div className="text-2xl font-bold text-green-600">{stats.online}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-sm ">Offline/Error</div>
-          <div className="text-2xl font-bold">{stats.offline + stats.error}</div>
+          <div className="text-sm text-gray-500">Offline/Error</div>
+          <div className="text-2xl font-bold text-orange-600">{stats.offline + stats.error}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-sm">Low Ink</div>
-          <div className="text-2xl font-bold ">{stats.lowInk}</div>
+          <div className="text-sm text-gray-500">Low Ink</div>
+          <div className="text-2xl font-bold text-yellow-600">{stats.lowInk}</div>
         </div>
         <div className="rounded-lg border p-4">
-          <div className="text-sm">Critical Ink</div>
-          <div className="text-2xl font-bold">{stats.criticalInk}</div>
+          <div className="text-sm text-gray-500">Critical Ink</div>
+          <div className="text-2xl font-bold text-red-600">{stats.criticalInk}</div>
         </div>
       </div>
 
@@ -262,11 +332,23 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
             <DropdownMenuItem onClick={() => setStatusFilter('offline')}>
               Offline
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setStatusFilter('error')}>
-              Error
+            <DropdownMenuItem onClick={() => setStatusFilter('printing')}>
+              Printing
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setStatusFilter('paused')}>
               Paused
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter('paper_jam')}>
+              Paper Jam
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter('out_of_paper')}>
+              Out of Paper
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter('door_open')}>
+              Door Open
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter('error')}>
+              Error
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -361,6 +443,7 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                       <div className="font-medium text-gray-900">
                         {printer.display_name || printer.name}
                       </div>
+                      {getLowInkIndicator(printer)}
                       <div className="text-xs text-gray-500">
                         ID: {printer.id}
                       </div>
@@ -411,6 +494,13 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                         >
                           <PauseCircle className="h-4 w-4 mr-2" />
                           Pause Printer
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-green-600"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          Resume Printer
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

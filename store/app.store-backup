@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api } from "../services/api";
+import { api } from "../services/api js backup";
 import { persist } from "zustand/middleware";
 
 export const useAppStore = create(
@@ -7,9 +7,9 @@ export const useAppStore = create(
     (set, get) => ({
       // ========== STATE ==========
       agents: [],
+      printers: [], // ← HAPUS agentsWithKeys
       selectedAgentId: null,
       health: null,
-      systemInfo: null,
 
       companies: [],
       departments: [],
@@ -18,8 +18,9 @@ export const useAppStore = create(
       isLoading: false,
       error: null,
 
-      // ========== AGENT ACTIONS ==========
-      
+      // ========== ACTIONS ==========
+
+      // 1. LOAD ALL AGENTS (pake JWT)
       loadAgents: async () => {
         try {
           set({ isLoading: true, error: null });
@@ -42,34 +43,40 @@ export const useAppStore = create(
         }
       },
 
+      // 2. SELECT AGENT & LOAD PRINTERS (PAKE JWT)
       selectAgent: async (agentId) => {
         if (!agentId) return;
 
         try {
           set({ selectedAgentId: agentId, isLoading: true });
 
-          console.log(`🔄 Selecting agent ${agentId}`);
+          console.log(`🔄 Fetching agent ${agentId} with JWT`);
           
+          // LANGSUNG PAKE API.GETAGENT (JWT)
           const data = await api.getAgent(agentId);
 
           if (data.success) {
-            set({ isLoading: false });
-            console.log(`✅ Selected agent ${agentId}`);
+            set({
+              printers: data.printers || [],
+              isLoading: false
+            });
+
+            console.log(`✅ Loaded ${data.printers?.length || 0} printers for ${agentId}`);
             return data;
           }
 
         } catch (error) {
-          console.error(`❌ Failed to select agent ${agentId}:`, error);
+          console.error(`❌ Failed to load agent ${agentId}:`, error);
           set({
             error: error.message,
-            isLoading: false
+            isLoading: false,
+            printers: []
           });
           throw error;
         }
       },
 
-      // ========== SYSTEM ACTIONS ==========
-
+      // 3. LOAD HEALTH
       loadHealth: async () => {
         try {
           const res = await api.getHealth();
@@ -81,28 +88,17 @@ export const useAppStore = create(
         }
       },
 
-      loadSystemInfo: async () => {
-        try {
-          const res = await api.getSystemInfo();
-          set({ systemInfo: res });
-          return res;
-        } catch (error) {
-          console.error("Failed to load system info:", error);
-          throw error;
-        }
-      },
-
+      // 4. LOAD DASHBOARD
       loadDashboard: async () => {
         try {
           set({ isLoading: true });
 
           await Promise.all([
             get().loadAgents(),
-            get().loadHealth(),
-            get().loadSystemInfo()
+            get().loadHealth()
           ]);
 
-          // Auto-select first agent if none selected
+          // Auto-select first agent
           const { agents, selectedAgentId } = get();
           if (agents.length > 0 && !selectedAgentId) {
             await get().selectAgent(agents[0].id);
@@ -116,7 +112,6 @@ export const useAppStore = create(
       },
 
       // ========== COMPANY ACTIONS ==========
-
       loadCompanies: async () => {
         try {
           set({ isLoading: true, error: null });
@@ -161,21 +156,7 @@ export const useAppStore = create(
         }
       },
 
-      verifyCompanyLicense: async (licenseKey) => {
-        try {
-          set({ isLoading: true, error: null });
-          const res = await api.verifyCompanyLicense(licenseKey);
-          set({ isLoading: false });
-          return res;
-        } catch (error) {
-          console.error("Failed to verify license:", error);
-          set({ error: error.message, isLoading: false });
-          throw error;
-        }
-      },
-
       // ========== DEPARTMENT ACTIONS ==========
-
       loadDepartments: async (companyId) => {
         try {
           const res = await api.getDepartments(companyId);
@@ -212,30 +193,53 @@ export const useAppStore = create(
         return agents.find(a => a.id === selectedAgentId) || null;
       },
 
-      getAgentById: (agentId) => {
-        return get().agents.find(a => a.id === agentId);
+      getPrinterByName: (name) => {
+        return get().printers.find(p =>
+          p.name === name || p.displayName === name
+        );
       },
 
-      getCompanyById: (companyId) => {
-        return get().companies.find(c => c.id === companyId);
+      getStats: () => {
+        const printers = get().printers;
+        return {
+          total: printers.length,
+          online: printers.filter(p => p.status === "READY" || p.status === "online").length,
+          offline: printers.filter(p => p.status !== "READY" && p.status !== "online").length,
+          lowInk: printers.filter(p => p.hasLowInk).length,
+          criticalInk: printers.filter(p => p.hasCriticalInk).length,
+          pagesToday: printers.reduce((sum, p) => sum + (p.pagesToday || 0), 0)
+        };
       },
 
-      getDepartmentById: (departmentId) => {
-        return get().departments.find(d => d.id === departmentId);
+      // ========== DAILY REPORTS (PAKE JWT) ==========
+      fetchAgentDailyReports: async (agentId, params = {}) => {
+        try {
+          // LANGSUNG PAKE API.GETAGENTDAILYREPORTS (JWT)
+          const data = await api.getAgentDailyReports(agentId, params);
+          return data;
+
+        } catch (error) {
+          console.error(`❌ Failed to fetch daily reports for ${agentId}:`, error);
+          throw error;
+        }
       },
 
       // ========== UTILS ==========
 
       refresh: async () => {
         await get().loadDashboard();
+        const { selectedAgentId } = get();
+        if (selectedAgentId) {
+          await get().selectAgent(selectedAgentId);
+        }
       },
 
       reset: () => {
         set({
           agents: [],
+          printers: [],
           selectedAgentId: null,
           health: null,
-          systemInfo: null,
           companies: [],
           departments: [],
           selectedCompanyId: null,

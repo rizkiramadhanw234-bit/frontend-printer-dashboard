@@ -200,7 +200,7 @@ export default function ListPrinter({ onSelectPrinter, selectedPrinter }) {
       </div>
 
       {/* Printer List */}
-      <ScrollArea className="h-[calc(100vh-500px)] min-h-[200px]">
+      <ScrollArea className="h-[calc(100vh-500px)] min-h-50">
         <div className="space-y-2 pr-2">
           {allPrinters.length === 0 ? (
             <div className="text-center py-8 text-gray-400 text-xs">

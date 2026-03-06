@@ -1,18 +1,20 @@
+// components/cards/AgentCard.jsx
 "use client";
 
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { 
   Monitor, Building, Users, Wifi, Clock, Printer 
 } from "lucide-react";
 
-export default function AgentCard({ agent }) {
+export default function AgentCard({ agent, onClick }) {
   if (!agent) return null;
   
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-4">
+    <div 
+      className="border border-gray-200 rounded-lg hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => onClick?.(agent)}
+    >
+      <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${
@@ -29,9 +31,13 @@ export default function AgentCard({ agent }) {
             </div>
           </div>
           
-          <Badge variant={agent.isOnline ? "default" : "secondary"}>
+          <span className={`px-2 py-1 text-xs rounded ${
+            agent.isOnline 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-gray-100 text-gray-800'
+          }`}>
             {agent.status}
-          </Badge>
+          </span>
         </div>
         
         <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
@@ -62,7 +68,7 @@ export default function AgentCard({ agent }) {
             <span className="font-mono">{agent.ip}</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

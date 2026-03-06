@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     Card,
@@ -35,6 +35,7 @@ import {
     Network,
     Activity
 } from "lucide-react";
+import { api } from "@/services/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -54,34 +55,10 @@ export default function AgentDetailPage() {
         setError(null);
 
         try {
-            const apiKeyRes = await fetch(`${API_URL}/api/agents/${agentId}/api-key`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
-                }
-            });
+            // LANGSUNG PAKE API.GETAGENT (YANG UDAH DI SET FALSE = JWT)
+            const data = await api.getAgent(agentId);
 
-            if (!apiKeyRes.ok) throw new Error('Failed to get API key');
-            const apiKeyData = await apiKeyRes.json();
-            const apiKey = apiKeyData.apiKey;
-
-            console.log('🔑 Got API Key:', apiKey.substring(0, 10) + '...');
-
-            // 2. PAKE API KEY BUAT AMBIL AGENT DETAIL
-            const res = await fetch(`${API_URL}/api/agents/${agentId}`, {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`  // ← PAKE API KEY, BUKAN JWT!
-                }
-            });
-
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error('❌ Agent detail error:', res.status, errorText);
-                throw new Error(`HTTP ${res.status}`);
-            }
-
-            const data = await res.json();
             console.log('✅ Agent detail loaded:', data.agent?.name);
-
             setAgent(data.agent);
             setPrinters(data.printers || []);
 
@@ -227,26 +204,28 @@ export default function AgentDetailPage() {
                                 const isCritical = level < 10;
 
                                 return (
-                                    <div key={color} className="space-y-1">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-600">{colorName}</span>
-                                            <span className={`font-medium ${isCritical ? 'text-red-600' :
+                                    <Fragment key={`${printer.id}-${color}`}>
+                                        <div key={color} className="space-y-1">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-gray-600">{colorName}</span>
+                                                <span className={`font-medium ${isCritical ? 'text-red-600' :
                                                     isLow ? 'text-orange-600' :
                                                         'text-gray-700'
-                                                }`}>
-                                                {level}%
-                                            </span>
-                                        </div>
-                                        <Progress
-                                            value={level}
-                                            className={`
+                                                    }`}>
+                                                    {level}%
+                                                </span>
+                                            </div>
+                                            <Progress
+                                                value={level}
+                                                className={`
                                             h-1.5 bg-gray-100
                                             ${isCritical ? '[&>div]:bg-red-600' : ''}
                                             ${isLow && !isCritical ? '[&>div]:bg-orange-500' : ''}
                                             ${!isLow && !isCritical ? '[&>div]:bg-green-600' : ''}
                                         `}
-                                        />
-                                    </div>
+                                            />
+                                        </div>
+                                    </Fragment>
                                 );
                             })}
                         </div>
@@ -454,8 +433,8 @@ export default function AgentDetailPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 gap-4">
-                                    {printers.map(printer => (
-                                        <PrinterCard key={printer.id} printer={printer} />
+                                    {printers.map((printer, index) => (
+                                        <PrinterCard key={printer.id || printer.name || index} printer={printer} />
                                     ))}
                                 </div>
                             )}

@@ -49,36 +49,28 @@ export const useAppStore = create(
       },
 
       selectAgent: async (agentId) => {
-        if (!agentId) return;
-
         try {
           set({ selectedAgentId: agentId, isLoading: true });
 
-          const res = await api.getAgent(agentId);
+          const res = await api.getAgent(agentId);  
 
           if (res.success) {
-            // Simpan API key agent dari response detail
             const agentApiKey = res.agent?.apiKey;
 
             set(state => ({
               printers: res.printers || [],
               agentsWithKeys: {
                 ...state.agentsWithKeys,
-                [agentId]: agentApiKey
+                [agentId]: agentApiKey  
               },
               isLoading: false
             }));
 
-            return res;
+            console.log(`Agent ${agentId} selected, API key saved`);
           }
-
         } catch (error) {
           console.error(`Failed to load agent ${agentId}:`, error);
-          set({
-            error: error.message,
-            isLoading: false,
-            printers: []
-          });
+          set({ error: error.message, isLoading: false, printers: [] });
           throw error;
         }
       },

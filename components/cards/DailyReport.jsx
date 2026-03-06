@@ -2,61 +2,37 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, FileText, ChevronRight } from "lucide-react";
-import { useDailyReportStore } from "@/store/daily.reports";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useReportStore } from "@/store/report.store";
 
 export default function DailyReport({ agentId, limit = 5, showViewAll = true }) {
-  // Gunakan store
   const {
-    reports,
-    summary,
+    dailyReport,
     isLoading,
     error,
-    fetchAgentReports,
-    getReportsForChart
-  } = useDailyReportStore();
+    fetchDailyReport,
+  } = useReportStore();
 
   const [showAll, setShowAll] = useState(false);
 
   // Fetch data ketika agentId berubah
   useEffect(() => {
     if (agentId) {
-      fetchAgentReports(agentId, {
-        limit: 30, // Ambil lebih banyak untuk keperluan view all
-        sort: 'desc'
-      });
+      // Fetch daily report untuk agent ini
+      const today = new Date().toISOString().split('T')[0];
+      fetchDailyReport({ agentId, date: today });
     }
-  }, [agentId, fetchAgentReports]);
+  }, [agentId, fetchDailyReport]);
 
-  // Ambil reports terbatas
-  const displayedReports = showAll ? reports : reports?.slice(0, limit);
-
-  // Format summary
-  const formattedSummary = {
-    totalPages: summary?.totalPages?.toLocaleString() || '0',
-    avgPages: summary?.averagePages?.toLocaleString() || '0',
-    daysWithData: summary?.daysWithData || 0,
-    maxPages: summary?.maxPages?.toLocaleString() || '0'
-  };
+  // Ambil data dari dailyReport
+  const reports = dailyReport?.byAgent?.[0]?.printers || [];
+  const totalPages = dailyReport?.totalPages || 0;
+  const displayedReports = showAll ? reports : reports.slice(0, limit);
 
   if (!agentId) {
     return (
-      <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-        <CardContent className="p-8 text-center">
+      <div className="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+        <div className="p-8 text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="p-3 bg-gray-50 rounded-full">
               <Calendar className="h-6 w-6 text-gray-400" />
@@ -64,54 +40,43 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
             <p className="text-sm text-gray-500 font-medium">No Agent Selected</p>
             <p className="text-xs text-gray-400">Select an agent to view daily reports</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="border-b border-gray-100 pb-3">
+    <div className="border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+      {/* Header */}
+      <div className="border-b border-gray-100 pb-3 p-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <div className="text-sm font-medium flex items-center gap-2">
             <div className="p-1.5 bg-blue-50 rounded-md">
               <Calendar className="h-4 w-4 text-blue-600" />
             </div>
-            Daily Reports
-          </CardTitle>
+            Daily Report - Today
+          </div>
 
           {/* Summary Badge */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md cursor-help">
-                  <FileText className="h-3.5 w-3.5 text-gray-500" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    {formattedSummary.totalPages}
-                  </span>
-                  <span className="text-xs text-gray-500">pages</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-xs space-y-1">
-                  <p>📊 Average: {formattedSummary.avgPages} pages/day</p>
-                  <p>📅 {formattedSummary.daysWithData} days with data</p>
-                  <p>📈 Max: {formattedSummary.maxPages} pages</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md">
+            <FileText className="h-3.5 w-3.5 text-gray-500" />
+            <span className="text-sm font-semibold text-gray-900">
+              {totalPages.toLocaleString()}
+            </span>
+            <span className="text-xs text-gray-500">pages</span>
+          </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="pt-4">
+      {/* Content */}
+      <div className="pt-4 p-4">
         {isLoading ? (
           // Loading Skeleton
           <div className="space-y-3">
             {Array.from({ length: limit }).map((_, i) => (
               <div key={i} className="flex justify-between items-center">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-16" />
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -119,14 +84,12 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
           // Error State
           <div className="text-center py-6">
             <p className="text-xs text-red-500">{error}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => fetchAgentReports(agentId)}
-              className="mt-2 text-xs"
+            <button
+              onClick={() => fetchDailyReport({ agentId })}
+              className="mt-2 text-xs text-blue-600 hover:text-blue-700"
             >
               Try Again
-            </Button>
+            </button>
           </div>
         ) : !reports || reports.length === 0 ? (
           // Empty State
@@ -134,7 +97,7 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
             <div className="flex flex-col items-center gap-2">
               <FileText className="h-8 w-8 text-gray-300" />
               <p className="text-sm font-medium text-gray-500">No Reports Yet</p>
-              <p className="text-xs text-gray-400 max-w-[200px]">
+              <p className="text-xs text-gray-400 max-w-50">
                 Daily reports will appear here when available
               </p>
             </div>
@@ -142,41 +105,22 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
         ) : (
           // Reports List
           <>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-              {displayedReports.map((report, index) => {
-                const reportDate = new Date(report.report_date);
-                const isToday = new Date().toDateString() === reportDate.toDateString();
-
+            <div className="space-y-2 max-h-75 overflow-y-auto pr-1 custom-scrollbar">
+              {displayedReports.map((printer, index) => {
                 return (
                   <div
-                    key={report.id}
-                    className={`
-                      flex justify-between items-center py-2 px-2 
-                      border-b border-gray-100 last:border-0
-                      hover:bg-gray-50 rounded-md transition-colors
-                      ${isToday ? 'bg-blue-50/30' : ''}
-                    `}
+                    key={index}
+                    className="flex justify-between items-center py-2 px-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-md transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-gray-500">
-                        {reportDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                        {printer.name}
                       </span>
-                      {isToday && (
-                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                          Today
-                        </span>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-semibold text-gray-900">
-                        {report.total_pages?.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-gray-400 w-12">
-                        {report.printer_count || 0} printer{report.printer_count !== 1 ? 's' : ''}
+                        {printer.pages?.toLocaleString() || 0} Pages
                       </span>
                     </div>
                   </div>
@@ -184,25 +128,21 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
               })}
             </div>
 
-            {/* Footer dengan summary dan view all */}
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                {showViewAll && reports.length > limit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAll(!showAll)}
-                    className="text-xs text-blue-600 hover:text-blue-700 h-7 px-2"
-                  >
-                    {showAll ? 'Show Less' : `View All (${reports.length})`}
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </Button>
-                )}
+            {/* Footer */}
+            {showViewAll && reports.length > limit && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  {showAll ? 'Show Less' : `View All (${reports.length})`}
+                  <ChevronRight className="h-3 w-3" />
+                </button>
               </div>
-            </div>
+            )}
           </>
         )}
-      </CardContent>
+      </div>
 
       {/* CSS untuk custom scrollbar */}
       <style jsx>{`
@@ -221,6 +161,6 @@ export default function DailyReport({ agentId, limit = 5, showViewAll = true }) 
           background: #a1a1a1;
         }
       `}</style>
-    </Card>
+    </div>
   );
 }

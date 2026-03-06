@@ -19,30 +19,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
-import ListPrinter from "@/components/cards/ListPrinter"; // Import komponen ListPrinter
+import { useAlertStore } from "@/store/alert.store";
 
 export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {} }) {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
-  const [showPrinters, setShowPrinters] = useState(false); // State untuk toggle list printer
+  const [showPrinters, setShowPrinters] = useState(false);
   const [selectedPrinter, setSelectedPrinter] = useState(null);
   
-  // ✅ SAFE GET SEMUA!
   const serverStatus = health?.status || 'unknown';
   const isOnline = serverStatus === 'ok';
   const agentConnected = health?.agents?.connected || 0;
   const agentTotal = health?.agents?.total || 0;
   
-  // ✅ STATS DENGAN DEFAULT
   const printerTotal = stats?.total || 0;
   const offlineCount = stats?.offline || 0;
   const lowInkCount = stats?.lowInk || 0;
   const criticalInkCount = stats?.criticalInk || 0;
   const alertCount = offlineCount + lowInkCount + criticalInkCount;
+  const unreadCount = useAlertStore(state => state.unreadCount);
 
   const handleMenuClick = (key) => {
     onTabChange(key);
-    // Close printer list when switching tabs (optional)
     if (key !== 'printers') {
       setShowPrinters(false);
     }
@@ -56,7 +54,6 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
 
   const handlePrinterSelect = (printer) => {
     setSelectedPrinter(printer);
-    // Bisa juga navigate ke printer detail atau emit event
     console.log('Selected printer:', printer);
   };
 
@@ -86,7 +83,7 @@ export default function Sidebar({ activeTab, onTabChange, stats = {}, health = {
       key: "alerts",
       icon: <AlertCircle className="h-4 w-4" />,
       label: "Alerts",
-      badge: alertCount,
+      badge: unreadCount,
       badgeVariant: "destructive",
     },
     {

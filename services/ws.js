@@ -1,5 +1,5 @@
 const getWsUrl = () => {
-  const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
+  const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:15002";
   // Pastikan ada /ws/dashboard
   return base.includes('/ws/') ? base : `${base}/ws/dashboard`;
 };
@@ -17,19 +17,25 @@ class WebSocketService {
     this.isServerAvailable = true;
     this.lastConnectionAttempt = 0;
     this.MIN_CONNECTION_INTERVAL = 5000;
+    
+    // 🔥 Tambahkan untuk rate limiting
+    this.lastMessageTime = 0;
+    this.messageCount = 0;
   }
 
   async connect() {
     console.log(`🔌 Connecting to: ${this.wsUrl}`);
-    this.socket = new WebSocket(this.wsUrl);
 
+    // 🔥 FIX: Gunakan Date.now() bukan variabel 'now'
+    const currentTime = Date.now();
+    
     // ⚠️ CEK: Jangan reconnect terlalu sering
-    if (now - this.lastConnectionAttempt < this.MIN_CONNECTION_INTERVAL) {
+    if (currentTime - this.lastConnectionAttempt < this.MIN_CONNECTION_INTERVAL) {
       console.log("⏸️ Skipping connect - too soon since last attempt");
       return;
     }
 
-    this.lastConnectionAttempt = now;
+    this.lastConnectionAttempt = currentTime;
 
     if (this.isConnecting) {
       console.log("⏳ Already connecting, skipping...");
@@ -52,18 +58,18 @@ class WebSocketService {
     this.isConnecting = true;
 
     try {
-      console.log(`🔌 Attempting to connect to Dashboard WebSocket: ${WS_URL}`);
-      this.socket = new WebSocket(WS_URL);
+      console.log(`🔌 Attempting to connect to Dashboard WebSocket: ${this.wsUrl}`);
+      this.socket = new WebSocket(this.wsUrl);
 
       this.socket.onopen = () => {
         console.log("✅ Dashboard WebSocket connected successfully");
         this.reconnectAttempts = 0;
         this.isConnecting = false;
 
-        // Start heartbeat dengan interval lebih panjang
+        // Start heartbeat
         this.startHeartbeat();
 
-        // Notify semua subscriber bahwa sudah connect
+        // Notify semua subscriber
         this.notifySubscribers("connection", {
           type: "connected",
           timestamp: new Date().toISOString(),
@@ -76,7 +82,7 @@ class WebSocketService {
           const data = JSON.parse(event.data);
           console.log(
             "📨 WebSocket message received:",
-            data.type || data.event,
+            data.type || data.event || 'data',
           );
 
           // ⚠️ RATE LIMITING: Skip jika terlalu banyak messages
@@ -108,13 +114,32 @@ class WebSocketService {
             }
           }
 
-          // Broadcast ke semua subscriber juga
+          // Handle berdasarkan type (format dari backend kita)
+          if (data.type) {
+            switch (data.type) {
+              case "agent_connected":
+              case "agent_disconnected":
+                this.notifySubscribers("agents", data);
+                break;
+                
+              case "printer_update":
+              case "ink_update":
+                this.notifySubscribers("printers", data);
+                break;
+                
+              case "initial_data":
+                this.notifySubscribers("initial", data);
+                break;
+            }
+          }
+
+          // Broadcast ke semua subscriber
           this.notifySubscribers("broadcast", data);
         } catch (error) {
           console.error(
             "Failed to parse WebSocket message:",
             error,
-            event.data.substring(0, 100),
+            event.data?.substring?.(0, 100) || 'No data',
           );
         }
       };
@@ -143,7 +168,7 @@ class WebSocketService {
           timestamp: new Date().toISOString(),
         });
 
-        // ⚠️ PERBAIKI: Auto-reconnect hanya dengan delay lebih panjang
+        // ⚠️ Auto-reconnect dengan exponential backoff
         if (
           this.isServerAvailable &&
           event.code !== 1000 && // Bukan normal closure
@@ -174,10 +199,10 @@ class WebSocketService {
     }
   }
 
-  // ⚠️ TAMBAH: Rate limiting untuk messages
+  // ⚠️ Rate limiting untuk messages
   shouldSkipMessage() {
     const now = Date.now();
-    if (!this.lastMessageTime) {
+    if (this.lastMessageTime === 0) {
       this.lastMessageTime = now;
       this.messageCount = 1;
       return false;
@@ -266,13 +291,13 @@ class WebSocketService {
         return false;
       }
     } else {
-      console.warn("⚠️ WebSocket not connected, cannot send:", data);
+      console.warn("⚠️ WebSocket not connected, cannot send message");
       return false;
     }
   }
 
   startHeartbeat() {
-    this.stopHeartbeat(); // Clear existing interval
+    this.stopHeartbeat();
 
     this.heartbeatInterval = setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
@@ -281,7 +306,7 @@ class WebSocketService {
           timestamp: Date.now(),
         });
       }
-    }, 5000);
+    }, 30000); // 30 detik sekali
   }
 
   stopHeartbeat() {

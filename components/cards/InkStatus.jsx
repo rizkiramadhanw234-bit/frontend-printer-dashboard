@@ -1,4 +1,3 @@
-// components/cards/InkStatus.tsx (versi diperbarui)
 "use client";
 
 import React from "react";
@@ -6,9 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle } from "lucide-react";
-import { usePrinterStore } from "../../store/printer.store";
+import { usePrinterStore } from "../../store/printer.store-backup";
 
-export default function InkStatus({ printerName }) {
+export default function InkStatus({ printer }) {
+  if (!printer) return null;
   const { inkStatus } = usePrinterStore();
   const ink = inkStatus[printerName];
 
@@ -50,6 +50,7 @@ export default function InkStatus({ printerName }) {
 
   const getColorProgress = (color, level) => {
     if (level === null || level === undefined) return 0;
+    if (level === 0) return "destructive";
     if (level < 10) return "destructive";
     if (level < 20) return "warning";
     return "default";

@@ -1,21 +1,16 @@
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "../store/auth.store";
-
 export function useRequireAuth() {
   const router = useRouter();
-  const { isLoggedIn, loading, init } = useAuthStore();
+  const { isAuthenticated, isInitialized, checkAuth } = useAuthStore();
 
   useEffect(() => {
-    init(); 
-  }, [init]);
+    checkAuth();
+  }, []);
 
   useEffect(() => {
-    
-    if (!loading && !isLoggedIn) {
+    if (isInitialized && !isAuthenticated) {
       router.replace("/login");
     }
-  }, [loading, isLoggedIn, router]);
+  }, [isInitialized, isAuthenticated, router]);
 
-  return { loading, isLoggedIn };
+  return { isInitialized, isAuthenticated };
 }

@@ -1,23 +1,30 @@
+import { useAppStore } from '@/store/app.store';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:15000";
 
 const getJWTToken = () => {
-  const token = localStorage.getItem('jwt_token');
-  console.log('🔑 JWT Token:', token ? token.substring(0, 20) + '...' : 'Tidak ada');
-  return token;
-};
-
-// Helper buat dapetin API Key agent
-const getAgentApiKey = (agentId) => {
   try {
-    const store = JSON.parse(localStorage.getItem('app-storage') || '{}');
-    return store.state?.agentsWithKeys?.[agentId];
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      const token = parsed?.state?.token;
+      if (token) return token;
+    }
+
+    const legacyToken = localStorage.getItem('jwt_token');
+    if (legacyToken) return legacyToken;
+
   } catch (e) {
-    return null;
+    console.error('Error getting token:', e);
   }
+  return null;
 };
 
-async function fetchAPI(endpoint, options = {}, useAgentKey = false, agentId = null) {
+async function fetchAPI(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
+
+  const authType = options.authType || 'jwt';
+  const agentId = options.agentId;
 
   const headers = {
     'Content-Type': 'application/json',
@@ -25,51 +32,53 @@ async function fetchAPI(endpoint, options = {}, useAgentKey = false, agentId = n
     ...options.headers
   };
 
-  if (useAgentKey && agentId) {
-    const agentKey = getAgentApiKey(agentId);
-    if (agentKey) {
-      headers['Authorization'] = `Bearer ${agentKey}`;
-      console.log(`🔑 Using AGENT API key for ${agentId}`);
-    } else {
-      console.warn(`⚠️ No agent API key found for ${agentId}`);
-    }
-  }
-  // 2. JWT Token (buat dashboard)
-  else {
+  if (authType === 'jwt') {
     const token = getJWTToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-      console.log(`🔑 Using JWT token`);
+    }
+  } else if (authType === 'apikey' && agentId) {
+    // 🔥 Ambil API key dari store (langsung dari state, bukan method)
+    const appState = useAppStore.getState();
+    const apiKey = appState.agentsWithKeys?.[agentId];
+    
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      console.log(`🔑 Using API key for agent ${agentId}`);
     } else {
-      console.warn(`⚠️ No JWT token found!`);
+      console.error(`❌ No API key found for agent ${agentId}`);
     }
   }
 
-  console.log(`🌐 Fetching: ${url}`);
+  console.log(`🌐 Fetching: ${url} with auth: ${authType}`);
 
-  const res = await fetch(url, { headers, ...options });
+  try {
+    const res = await fetch(url, { headers, ...options });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error(`❌ API Error ${res.status}:`, errorText);
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`❌ API Error ${res.status}:`, errorText);
 
-    // Kalo 401 dan pake JWT, redirect ke login
-    if (res.status === 401 && !useAgentKey) {
-      console.log('🚫 JWT token invalid, redirecting to login...');
-      localStorage.removeItem('jwt_token');
-      window.location.href = '/login';
+      if (res.status === 401) {
+        console.log('JWT token invalid');
+        localStorage.removeItem('jwt_token');
+      }
+
+      throw new Error(`API Error ${res.status}: ${errorText}`);
     }
 
-    throw new Error(`API Error ${res.status}: ${errorText}`);
+    const data = await res.json();
+    console.log(`✅ API Success:`, endpoint.substring(0, 50), data);
+    return data;
+    
+  } catch (error) {
+    console.error(`❌ Network error for ${url}:`, error);
+    throw error;
   }
-
-  const data = await res.json();
-  console.log(`✅ API Success:`, endpoint, data);
-  return data;
 }
 
 export const api = {
-  // ========== AUTH - PAKE JWT ==========
+  // ========== AUTH ==========
   login: (email, password) =>
     fetchAPI('/api/auth/login', {
       method: 'POST',
@@ -77,59 +86,100 @@ export const api = {
     }),
 
   logout: () => fetchAPI('/api/auth/logout', { method: 'POST' }),
+
   checkAuth: () => fetchAPI('/api/auth/check'),
 
-  // ========== DASHBOARD ENDPOINTS - PAKE JWT ==========
-  getAllAgents: () => fetchAPI('/api/agents'),
+  // ========== HEALTH & SYSTEM ==========
   getHealth: () => fetchAPI('/api/health'),
+  getSystemInfo: () => fetchAPI('/api/system/info'),
   getWebsocketStatus: () => fetchAPI('/api/websocket/status'),
 
-  // GELL ALL PRINTERS
-  getAllPrinters: () =>
-    fetchAPI('/api/printers', {}, false, null),
+  // ========== AGENTS ==========
+  getAllAgents: () => fetchAPI('/api/agents'),
+  getAgent: (agentId) => fetchAPI(`/api/agents/${agentId}`),
 
-  // ========== COMPANY & DEPARTEMENT - PAKE JWT ==========
-  getCompanies: () => fetchAPI('/api/company'),
-  getDepartments: (companyId) => fetchAPI(`/api/departement/${companyId}`),
-  createDepartment: (companyId, name) =>
-    fetchAPI(`/api/company/${companyId}/departements`, {
-      method: 'POST',
-      body: JSON.stringify({ name })
+  getAgentProfile: (agentToken) =>
+    fetchAPI('/api/agents/agent/profile', {
+      headers: { 'Authorization': `Bearer ${agentToken}` }
     }),
 
-  // ========== AGENT DETAIL - PAKE AGENT API KEY ==========
-  getAgent: (agentId) =>
-    fetchAPI(`/api/agents/${agentId}`, {}, true, agentId),
+  // 🔥 ENDPOINT KHUSUS AMBIL API KEY
+  getAgentApiKey: (agentId) =>
+    fetchAPI(`/api/agents/${agentId}/api-key`),
 
-  getAgentDailyReports: (agentId, params = {}) => {
-    const queryString = new URLSearchParams({
-      page: params.page || 1,
-      limit: params.limit || 30,
-      ...(params.startDate && { startDate: params.startDate }),
-      ...(params.endDate && { endDate: params.endDate })
-    }).toString();
+  // ========== PRINTERS ==========
+  getAllPrinters: () => fetchAPI('/api/printers'),
 
-    const endpoint = `/api/agents/${agentId}/daily-reports${queryString ? `?${queryString}` : ''}`;
+  // ✅ PAKAI FETCHAPI DENGAN AUTHTYPE=APIKEY
+  getAgentPrinters: (agentId) =>
+    fetchAPI(`/api/agents/${agentId}/printers`, {
+      authType: 'apikey',
+      agentId
+    }),
 
-    return fetchAPI(endpoint, {}, false, agentId);  // false = pake JWT
-  },
+  getAgentPrinter: (agentId, printerName) =>
+    fetchAPI(`/api/agents/${agentId}/printer?name=${encodeURIComponent(printerName)}`, {
+      authType: 'apikey',
+      agentId
+    }),
 
-  // ========== PRINTER CONTROL - PAKE AGENT API KEY ==========
   pausePrinter: (agentId, printerName) =>
     fetchAPI(`/api/agents/${agentId}/printer/pause`, {
       method: 'POST',
+      authType: 'apikey',
+      agentId,
       body: JSON.stringify({ printerName })
-    }, true, agentId),
+    }),
 
   resumePrinter: (agentId, printerName) =>
     fetchAPI(`/api/agents/${agentId}/printer/resume`, {
       method: 'POST',
+      authType: 'apikey',
+      agentId,
       body: JSON.stringify({ printerName })
-    }, true, agentId),
+    }),
 
-  // ========== REPORTS - PAKE JWT ==========
-  getMonthlyReport: (year, month) =>
-    fetchAPI(`/api/agents/reports/monthly?year=${year}&month=${month}`),
+  // ========== STATS ==========
+  getAgentStats: () => fetchAPI('/api/stats/agents'),
+  getPrintStats: () => fetchAPI('/api/stats/prints'),
+
+  // ========== REPORTS ==========
+  getDailyReport: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.date) query.append('date', params.date);
+    if (params.agentId) query.append('agentId', params.agentId);
+    if (params.companyId) query.append('companyId', params.companyId);
+    return fetchAPI(`/api/reports/daily${query.toString() ? `?${query}` : ''}`);
+  },
+
+  getMonthlyReport: (year, month, params = {}) => {
+    const query = new URLSearchParams({ year, month });
+    if (params.agentId) query.append('agentId', params.agentId);
+    if (params.companyId) query.append('companyId', params.companyId);
+    return fetchAPI(`/api/reports/monthly?${query.toString()}`);
+  },
+
+  getPrinterLifetimeReport: (printerName) =>
+    fetchAPI(`/api/reports/printer/${encodeURIComponent(printerName)}/lifetime`),
+
+  getCompanyReport: (companyId, params = {}) => {
+    const query = new URLSearchParams();
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    return fetchAPI(`/api/reports/company/${companyId}${query.toString() ? `?${query}` : ''}`);
+  },
+
+  exportReport: (type, params = {}) => {
+    const query = new URLSearchParams({ type });
+    if (params.date) query.append('date', params.date);
+    if (params.year) query.append('year', params.year);
+    if (params.month) query.append('month', params.month);
+    if (params.printerName) query.append('printerName', params.printerName);
+    return fetchAPI(`/api/reports/export?${query.toString()}`);
+  },
+
+  // ========== COMPANY ==========
+  getCompanies: () => fetchAPI('/api/company'),
 
   createCompany: (companyData) =>
     fetchAPI('/api/company', {
@@ -138,7 +188,21 @@ export const api = {
     }),
 
   deleteCompany: (companyId) =>
-    fetchAPI(`/api/company/${companyId}`, {
-      method: 'DELETE'
+    fetchAPI(`/api/company/${companyId}`, { method: 'DELETE' }),
+
+  verifyCompanyLicense: (licenseKey) =>
+    fetchAPI('/api/company/verify', {
+      method: 'POST',
+      body: JSON.stringify({ licenseKey })
+    }),
+
+  // ========== DEPARTMENT ==========
+  getDepartments: (companyId) =>
+    fetchAPI(`/api/departement/${companyId}`),
+
+  createDepartment: (companyId, name) =>
+    fetchAPI(`/api/company/${companyId}/departements`, {
+      method: 'POST',
+      body: JSON.stringify({ name })
     }),
 };

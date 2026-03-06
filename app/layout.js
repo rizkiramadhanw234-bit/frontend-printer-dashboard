@@ -20,11 +20,7 @@ const geistMono = Geist_Mono({
 // };
 
 export default function RootLayout({ children }) {
-  const init = useAuthStore((state) => state.init);
-  React.useEffect(() => {
-    init();
-  }, [init]);
-
+  
   return (
     <html lang="en">
       <body

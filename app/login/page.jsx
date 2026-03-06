@@ -33,7 +33,17 @@ export default function Login() {
     setErrorMessage("");
     try {
       const res = await login(email, password);
+      console.log('Login result:', res);
+
       if (res.success) {
+        // Cek token tersimpan gak
+        console.log('Token di localStorage:', localStorage.getItem('jwt_token'));
+        console.log('Auth state:', useAuthStore.getState());
+
+        // Tunggu sebentar sebelum redirect
+        await new Promise(r => setTimeout(r, 500));
+
+        console.log('Auth state setelah delay:', useAuthStore.getState());
         router.push("/dashboard");
       } else {
         setErrorMessage("Email atau password salah");
@@ -44,40 +54,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-
-  // const [email, setEmail] = React.useState("");
-  // const [password, setPassword] = React.useState("");
-  // const [loading, setLoading] = React.useState(false);
-  // const [errorMessage, setErrorMessage] = React.useState("");
-
-  // const handleLogin = async (e) => {
-  //   e.preventDefault();
-  //   setLoading(true);
-  //   setErrorMessage("");
-
-  //   const hardUser = {
-  //     email: "admin@gmail.com",
-  //     password: "123456",
-  //     token: "token-123",
-  //   };
-
-  //   try {
-  //     await new Promise((resolve) => setTimeout(resolve, 800));
-
-  //     if (email === hardUser.email && password === hardUser.password) {
-  //       localStorage.setItem("token", hardUser.token);
-
-  //       router.push("/dashboard");
-  //     } else {
-  //       setErrorMessage("Email atau password salah");
-  //     }
-  //   } catch (error) {
-  //     setErrorMessage("Terjadi kesalahan.");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   return (
     <>
