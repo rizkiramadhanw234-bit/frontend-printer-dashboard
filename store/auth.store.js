@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "../services/api";
-import { persist, createJSONStorage } from "zustand/middleware"; // ← tambah createJSONStorage
+import { persist, createJSONStorage } from "zustand/middleware"; 
 
 export const useAuthStore = create(
   persist(

@@ -20,6 +20,7 @@ import CompanyModal from "@/components/company/Management";
 import DepartmentModal from "@/components/company/Departement";
 import DeleteCompanyDialog from "@/components/company/DeleteDialog";
 import PrinterDetailModal from "@/components/modals/PrinterDetailModal";
+import ReportView from "@/components/reports/ReportsView";
 import AlertCard from "@/components/cards/AlertCard";
 import {
   RefreshCw,
@@ -603,92 +604,7 @@ export default function DashboardPage() {
 
           {/* REPORTS TAB */}
           {activeTab === "reports" && (
-            <div className="space-y-6">
-              {/* Header dengan statistik global */}
-              <div className="bg-white rounded-lg border p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Print Reports Overview</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-500">Total Agents</div>
-                    <div className="text-2xl font-bold">{agents.length}</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-500">Total Printers</div>
-                    <div className="text-2xl font-bold">{allPrintersStats.total || 0}</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-500">Active Printers</div>
-                    <div className="text-2xl font-bold">{allPrintersStats.online || 0}</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-500">Companies</div>
-                    <div className="text-2xl font-bold">{companies.length}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Agent Selector untuk Reports */}
-              <div className="bg-white rounded-lg border p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  View Reports by Agent
-                </h3>
-                <select
-                  value={selectedAgentId || ""}
-                  onChange={(e) => handleSelectAgent(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Select Agent --</option>
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.name} ({agent.company})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Daily Reports untuk Agent terpilih */}
-              {selectedAgent ? (
-                <div className="bg-white rounded-lg border p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Daily Reports: {selectedAgent.name}
-                    </h3>
-                    <span className="px-2 py-1 border rounded text-xs">
-                      {selectedAgent.company} - {selectedAgent.department}
-                    </span>
-                  </div>
-
-                  <DailyReport
-                    agentId={selectedAgentId}
-                    limit={10}
-                    showViewAll={false}
-                  />
-                </div>
-              ) : (
-                <div className="bg-white rounded-lg border p-12 text-center">
-                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Agent</h3>
-                  <p className="text-gray-500">
-                    Choose an agent from the dropdown above to view their daily reports
-                  </p>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => alert('Monthly reports coming soon!')}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
-                >
-                  Monthly Reports
-                </button>
-                <button
-                  onClick={() => alert('Export feature coming soon!')}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
-                >
-                  Export Data
-                </button>
-              </div>
-            </div>
+            <ReportView />
           )}
 
           {/* SETTINGS TAB */}

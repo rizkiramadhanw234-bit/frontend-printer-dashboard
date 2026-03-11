@@ -38,10 +38,9 @@ async function fetchAPI(endpoint, options = {}) {
       headers['Authorization'] = `Bearer ${token}`;
     }
   } else if (authType === 'apikey' && agentId) {
-    // 🔥 Ambil API key dari store (langsung dari state, bukan method)
     const appState = useAppStore.getState();
     const apiKey = appState.agentsWithKeys?.[agentId];
-    
+
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
       console.log(`🔑 Using API key for agent ${agentId}`);
@@ -70,7 +69,7 @@ async function fetchAPI(endpoint, options = {}) {
     const data = await res.json();
     console.log(`✅ API Success:`, endpoint.substring(0, 50), data);
     return data;
-    
+
   } catch (error) {
     console.error(`❌ Network error for ${url}:`, error);
     throw error;
@@ -103,14 +102,12 @@ export const api = {
       headers: { 'Authorization': `Bearer ${agentToken}` }
     }),
 
-  // 🔥 ENDPOINT KHUSUS AMBIL API KEY
   getAgentApiKey: (agentId) =>
     fetchAPI(`/api/agents/${agentId}/api-key`),
 
   // ========== PRINTERS ==========
   getAllPrinters: () => fetchAPI('/api/printers'),
 
-  // ✅ PAKAI FETCHAPI DENGAN AUTHTYPE=APIKEY
   getAgentPrinters: (agentId) =>
     fetchAPI(`/api/agents/${agentId}/printers`, {
       authType: 'apikey',

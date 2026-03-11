@@ -1,6 +1,5 @@
 const getWsUrl = () => {
   const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:15002";
-  // Pastikan ada /ws/dashboard
   return base.includes('/ws/') ? base : `${base}/ws/dashboard`;
 };
 
