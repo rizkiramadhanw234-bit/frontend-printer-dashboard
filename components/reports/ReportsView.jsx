@@ -91,15 +91,34 @@ function CustomTooltip({ active, payload, label }) {
     );
 }
 
+// ─── Helper: generate array of dates between start and end ───────────────────
+function getDatesBetween(start, end) {
+    const dates = [];
+    const cur = new Date(start);
+    const last = new Date(end);
+    while (cur <= last) {
+        dates.push(cur.toISOString().split("T")[0]);
+        cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+}
+
 // ─── DAILY REPORT VIEW ────────────────────────────────────────────────────────
 function DailyReportView({ agents }) {
     const { fetchDailyReport, dailyReport, isLoading, error } = useReportStore();
     const printRef = useRef(null);
 
     const today = new Date().toISOString().split("T")[0];
+    // Default: last 7 days
+    const defaultStart = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split("T")[0]; })();
+
+    const [mode, setMode] = useState("range"); // "single" | "range"
     const [selectedDate, setSelectedDate] = useState(today);
+    const [startDate, setStartDate] = useState(defaultStart);
+    const [endDate, setEndDate] = useState(today);
+    const [appliedStart, setAppliedStart] = useState(defaultStart);
+    const [appliedEnd, setAppliedEnd] = useState(today);
     const [selectedAgentId, setSelectedAgentId] = useState("");
-    const [dateRange, setDateRange] = useState("1");
     const [isExporting, setIsExporting] = useState(false);
     const [rangeReports, setRangeReports] = useState([]);
     const [rangeLoading, setRangeLoading] = useState(false);
@@ -107,64 +126,64 @@ function DailyReportView({ agents }) {
 
     // Fetch single day
     useEffect(() => {
-        if (dateRange === "1") {
+        if (mode === "single") {
             fetchDailyReport({ date: selectedDate, agentId: selectedAgentId || undefined });
         }
-    }, [selectedDate, selectedAgentId, dateRange]);
+    }, [selectedDate, selectedAgentId, mode]);
 
-    // Fetch range (multi-day paralel)
+    // Fetch range on Apply
+    const handleApplyRange = async () => {
+        if (!appliedStart || !appliedEnd || appliedStart > appliedEnd) return;
+        setRangeLoading(true);
+        setRangeSummary(null);
+
+        const dates = getDatesBetween(appliedStart, appliedEnd);
+        const { fetchDailyReport: fetchFn } = useReportStore.getState();
+
+        const responses = await Promise.allSettled(
+            dates.map(date => fetchFn({ date, agentId: selectedAgentId || undefined }))
+        );
+
+        const normalized = responses.map((res, i) => {
+            const date = dates[i];
+            if (res.status === "rejected" || !res.value) {
+                return { date, totalPages: 0, agentCount: 0, printerCount: 0 };
+            }
+            return {
+                date,
+                totalPages: parseInt(res.value.totalPages || 0),
+                agentCount: res.value.agentCount || 0,
+                printerCount: res.value.printerCount || 0,
+            };
+        });
+
+        const totalPages = normalized.reduce((s, r) => s + r.totalPages, 0);
+        const daysWithData = normalized.filter(r => r.totalPages > 0).length;
+        const pagesArr = normalized.map(r => r.totalPages);
+
+        setRangeReports(normalized);
+        setRangeSummary({
+            totalPages,
+            averagePages: daysWithData ? Math.round(totalPages / daysWithData) : 0,
+            maxPages: Math.max(...pagesArr, 0),
+            minPages: daysWithData ? Math.min(...pagesArr.filter(v => v > 0)) : 0,
+            daysWithData,
+            totalDays: dates.length,
+        });
+        setRangeLoading(false);
+    };
+
+    // Auto-fetch on first load (range mode)
     useEffect(() => {
-        if (dateRange === "1") return;
-        const fetchRange = async () => {
-            setRangeLoading(true);
-            const days = parseInt(dateRange);
-            const dates = Array.from({ length: days }, (_, i) => {
-                const d = new Date();
-                d.setDate(d.getDate() - (days - 1 - i));
-                return d.toISOString().split("T")[0];
-            });
-
-            const { fetchDailyReport: fetchFn } = useReportStore.getState();
-            const responses = await Promise.allSettled(
-                dates.map(date => fetchFn({ date, agentId: selectedAgentId || undefined }))
-            );
-
-            const normalized = responses.map((res, i) => {
-                const date = dates[i];
-                if (res.status === "rejected" || !res.value) {
-                    return { date, totalPages: 0, agentCount: 0, printerCount: 0 };
-                }
-                return {
-                    date,
-                    totalPages: parseInt(res.value.totalPages || 0),
-                    agentCount: res.value.agentCount || 0,
-                    printerCount: res.value.printerCount || 0,
-                };
-            });
-
-            const totalPages = normalized.reduce((s, r) => s + r.totalPages, 0);
-            const daysWithData = normalized.filter(r => r.totalPages > 0).length;
-            const pagesArr = normalized.map(r => r.totalPages);
-
-            setRangeReports(normalized);
-            setRangeSummary({
-                totalPages,
-                averagePages: daysWithData ? Math.round(totalPages / daysWithData) : 0,
-                maxPages: Math.max(...pagesArr, 0),
-                minPages: daysWithData ? Math.min(...pagesArr.filter(v => v > 0)) : 0,
-                daysWithData,
-            });
-            setRangeLoading(false);
-        };
-        fetchRange();
-    }, [dateRange, selectedAgentId]);
+        if (mode === "range") handleApplyRange();
+    }, [mode, selectedAgentId]);
 
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            const filename = dateRange === "1"
+            const filename = mode === "single"
                 ? `daily-report-${selectedDate}.pdf`
-                : `daily-report-last${dateRange}days.pdf`;
+                : `daily-report-${appliedStart}-to-${appliedEnd}.pdf`;
             await exportToPDF(printRef, filename);
         } finally {
             setIsExporting(false);
@@ -173,34 +192,37 @@ function DailyReportView({ agents }) {
 
     const byPrinter = dailyReport?.byPrinter || [];
     const byAgent = dailyReport?.byAgent || [];
-    const totalPages = Number(dailyReport?.totalPages) || 0;
+    const totalPagesSingle = Number(dailyReport?.totalPages) || 0;
 
     const chartData = rangeReports.map(r => ({
         date: new Date(r.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
         pages: r.totalPages,
     }));
 
-    const isRangeMode = dateRange !== "1";
-    const showLoading = isRangeMode ? rangeLoading : isLoading;
+    const showLoading = mode === "range" ? rangeLoading : isLoading;
 
     return (
         <div className="space-y-4">
             {/* Controls */}
             <div className="flex flex-wrap items-center gap-3">
-                {/* Range dropdown */}
-                <select
-                    value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
-                    className="text-sm border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="1">Single Date</option>
-                    <option value="7">Last 7 Days</option>
-                    <option value="14">Last 14 Days</option>
-                    <option value="30">Last 30 Days</option>
-                </select>
+                {/* Mode toggle */}
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setMode("single")}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === "single" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                        Single Date
+                    </button>
+                    <button
+                        onClick={() => setMode("range")}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === "range" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                        Date Range
+                    </button>
+                </div>
 
-                {/* Date picker — only show in single day mode */}
-                {!isRangeMode && (
+                {/* Single date picker */}
+                {mode === "single" && (
                     <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
                         <Calendar className="h-4 w-4 text-gray-400" />
                         <input
@@ -210,6 +232,41 @@ function DailyReportView({ agents }) {
                             onChange={(e) => setSelectedDate(e.target.value)}
                             className="text-sm outline-none bg-transparent"
                         />
+                    </div>
+                )}
+
+                {/* Date range pickers */}
+                {mode === "range" && (
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <input
+                                type="date"
+                                value={startDate}
+                                max={endDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="text-sm outline-none bg-transparent"
+                            />
+                        </div>
+                        <span className="text-gray-400 text-sm">–</span>
+                        <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <input
+                                type="date"
+                                value={endDate}
+                                min={startDate}
+                                max={today}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="text-sm outline-none bg-transparent"
+                            />
+                        </div>
+                        <Button
+                            onClick={() => { setAppliedStart(startDate); setAppliedEnd(endDate); setTimeout(handleApplyRange, 0); }}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            Apply
+                        </Button>
                     </div>
                 )}
 
@@ -226,7 +283,7 @@ function DailyReportView({ agents }) {
 
                 <Button
                     onClick={handleExport}
-                    disabled={isExporting || showLoading || (!dailyReport && !rangeSummary)}
+                    disabled={isExporting || showLoading || (mode === "single" ? !dailyReport : !rangeSummary)}
                     className="ml-auto gap-2 bg-gray-900 hover:bg-gray-700 text-white"
                     size="sm"
                 >
@@ -243,7 +300,7 @@ function DailyReportView({ agents }) {
             )}
 
             {/* Error */}
-            {error && !showLoading && !isRangeMode && (
+            {error && !showLoading && mode === "single" && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     {error}
@@ -251,7 +308,7 @@ function DailyReportView({ agents }) {
             )}
 
             {/* ── RANGE MODE ── */}
-            {!showLoading && isRangeMode && rangeSummary && (
+            {!showLoading && mode === "range" && rangeSummary && (
                 <div ref={printRef} className="space-y-5 bg-white p-1 rounded-xl">
                     {/* Header */}
                     <div className="bg-gray-900 text-white rounded-xl p-5">
@@ -260,9 +317,13 @@ function DailyReportView({ agents }) {
                                 <div className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1">
                                     Daily Report
                                 </div>
-                                <div className="text-2xl font-bold">Last {dateRange} Days</div>
+                                <div className="text-2xl font-bold">
+                                    {new Date(appliedStart).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                    {" – "}
+                                    {new Date(appliedEnd).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                </div>
                                 <div className="text-xs text-gray-400 mt-1">
-                                    {rangeSummary.daysWithData} days with activity
+                                    {rangeSummary.daysWithData} of {rangeSummary.totalDays} days with activity
                                 </div>
                             </div>
                             <div className="text-right">
@@ -294,7 +355,7 @@ function DailyReportView({ agents }) {
                                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={40} />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Bar dataKey="pages" name="Pages" fill="#1d4ed8" radius={[4, 4, 0, 0]}
-                                        barSize={dateRange === "30" ? 8 : 20} />
+                                        barSize={getDatesBetween(appliedStart, appliedEnd).length > 20 ? 8 : 20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -337,7 +398,7 @@ function DailyReportView({ agents }) {
             )}
 
             {/* ── SINGLE DAY MODE ── */}
-            {!showLoading && !isRangeMode && dailyReport && (
+            {!showLoading && mode === "single" && dailyReport && (
                 <div ref={printRef} className="space-y-5 bg-white p-1 rounded-xl">
                     {/* Report Header */}
                     <div className="bg-gray-900 text-white rounded-xl p-5">
@@ -354,17 +415,17 @@ function DailyReportView({ agents }) {
                             </div>
                             <div className="text-right">
                                 <div className="text-xs text-gray-400">Total Pages</div>
-                                <div className="text-4xl font-black text-white">{totalPages.toLocaleString()}</div>
+                                <div className="text-4xl font-black text-white">{totalPagesSingle.toLocaleString()}</div>
                             </div>
                         </div>
                     </div>
 
                     {/* Stats Row */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <StatCard label="Total Pages" value={totalPages.toLocaleString()} color="blue" />
+                        <StatCard label="Total Pages" value={totalPagesSingle.toLocaleString()} color="blue" />
                         <StatCard label="Active Agents" value={dailyReport.agentCount} color="green" />
                         <StatCard label="Active Printers" value={dailyReport.printerCount} color="orange" />
-                        <StatCard label="Data Source" value={dailyReport.source} color="white" />
+                        <StatCard label="Data Source" value={dailyReport.source} color="purple" />
                     </div>
 
                     {/* By Agent */}
@@ -437,7 +498,7 @@ function DailyReportView({ agents }) {
                 </div>
             )}
 
-            {!showLoading && !error && !dailyReport && !isRangeMode && (
+            {!showLoading && !error && !dailyReport && mode === "single" && (
                 <div className="text-center py-16 text-gray-400">
                     <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
                     <p>No data for this date</p>
@@ -447,7 +508,7 @@ function DailyReportView({ agents }) {
     );
 }
 
-// ─── MONTHLY REPORT VIEW ──────────────────────────────────────────────────────
+//  MONTHLY REPORT VIEW 
 function MonthlyReportView({ agents }) {
     const { fetchMonthlyReport, monthlyReport, isLoading, error } = useReportStore();
     const printRef = useRef(null);
@@ -751,7 +812,7 @@ function MonthlyReportView({ agents }) {
     );
 }
 
-// ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
+//  MAIN EXPORT 
 export default function ReportView() {
     const { agents } = useAppStore();
     const [activeReport, setActiveReport] = useState("daily");

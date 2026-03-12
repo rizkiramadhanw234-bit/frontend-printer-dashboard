@@ -3,24 +3,24 @@ import { api } from "../services/api";
 
 export const useReportStore = create((set, get) => ({
   // ========== STATE ==========
-  
+
   // Daily Reports
   dailyReport: null,
   dailyReportHistory: [],
-  
+
   // Monthly Reports
   monthlyReport: null,
   monthlyReportHistory: {},
-  
+
   // Company Reports
   companyReports: {},
-  
+
   // Printer Lifetime Reports
   printerLifetimeReports: {},
-  
+
   isLoading: false,
   error: null,
-  
+
   // Filters
   filters: {
     date: null,
@@ -31,25 +31,25 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== DAILY REPORTS ==========
-  
+
   fetchDailyReport: async (params = {}) => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getDailyReport(params);
-      
-      set({ 
+
+      set({
         dailyReport: response,
         filters: { ...get().filters, ...params },
-        isLoading: false 
+        isLoading: false
       });
 
       console.log(`✅ Loaded daily report for ${response.date}`);
       return response;
-      
+
     } catch (error) {
       console.error("Failed to fetch daily report:", error);
-      set({ 
+      set({
         error: error.message,
         isLoading: false,
         dailyReport: null
@@ -68,31 +68,30 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== MONTHLY REPORTS ==========
-  
+
   fetchMonthlyReport: async (year, month, params = {}) => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getMonthlyReport(year, month, params);
-      
+
       const reportKey = `${year}-${month}`;
-      
-      set(state => ({ 
+
+      set(state => ({
         monthlyReport: response,
         monthlyReportHistory: {
           ...state.monthlyReportHistory,
           [reportKey]: response
         },
         filters: { ...state.filters, ...params },
-        isLoading: false 
+        isLoading: false
       }));
 
-      console.log(`✅ Loaded monthly report for ${year}-${month}`);
       return response;
-      
+
     } catch (error) {
       console.error("Failed to fetch monthly report:", error);
-      set({ 
+      set({
         error: error.message,
         isLoading: false,
         monthlyReport: null
@@ -114,29 +113,29 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== COMPANY REPORTS ==========
-  
+
   fetchCompanyReport: async (companyId, params = {}) => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getCompanyReport(companyId, params);
-      
-      set(state => ({ 
+
+      set(state => ({
         companyReports: {
           ...state.companyReports,
           [companyId]: response
         },
-        isLoading: false 
+        isLoading: false
       }));
 
       console.log(`✅ Loaded company report for ${companyId}`);
       return response;
-      
+
     } catch (error) {
       console.error(`Failed to fetch company report for ${companyId}:`, error);
-      set({ 
+      set({
         error: error.message,
-        isLoading: false 
+        isLoading: false
       });
       throw error;
     }
@@ -147,13 +146,13 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== PRINTER LIFETIME REPORTS ==========
-  
+
   fetchPrinterLifetimeReport: async (printerName) => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getPrinterLifetimeReport(printerName);
-      
+
       set(state => ({
         printerLifetimeReports: {
           ...state.printerLifetimeReports,
@@ -164,12 +163,12 @@ export const useReportStore = create((set, get) => ({
 
       console.log(`✅ Loaded lifetime report for ${printerName}`);
       return response;
-      
+
     } catch (error) {
       console.error(`Failed to fetch lifetime report for ${printerName}:`, error);
-      set({ 
+      set({
         error: error.message,
-        isLoading: false 
+        isLoading: false
       });
       throw error;
     }
@@ -180,7 +179,7 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== EXPORT ==========
-  
+
   exportDailyReport: async (date) => {
     try {
       const response = await api.exportReport('daily', { date });
@@ -212,7 +211,7 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== ANALYSIS HELPERS ==========
-  
+
   getDailyReportSummary: () => {
     const report = get().dailyReport;
     if (!report) return null;
@@ -270,7 +269,7 @@ export const useReportStore = create((set, get) => ({
   },
 
   // ========== FILTERS ==========
-  
+
   setFilters: (newFilters) => {
     set(state => ({
       filters: { ...state.filters, ...newFilters }
