@@ -74,7 +74,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
   // Combine active alerts and history based on filter
   const displayedAlerts = useMemo(() => {
     let items = [];
-    
+
     if (filterType === "active") {
       items = [...alerts];
     } else if (filterType === "history") {
@@ -111,7 +111,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
 
   // Sort: newest first
   const sortedAlerts = useMemo(() => {
-    return [...displayedAlerts].sort((a, b) => 
+    return [...displayedAlerts].sort((a, b) =>
       new Date(b.timestamp) - new Date(a.timestamp)
     );
   }, [displayedAlerts]);
@@ -128,7 +128,6 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
     setCurrentPage(1);
   }, [searchTerm, severityFilter, typeFilter, filterType]);
 
-  // 🔥 Helper functions yang diperbaiki
   const getSeverityIcon = (severity) => {
     switch (severity) {
       case 'critical':
@@ -278,7 +277,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
           </div>
           <div className="text-2xl font-bold text-blue-700">{stats.total}</div>
         </div>
-        
+
         <div className="bg-red-50 rounded-lg border border-red-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-red-600">Critical</div>
@@ -286,7 +285,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
           </div>
           <div className="text-2xl font-bold text-red-700">{stats.critical}</div>
         </div>
-        
+
         <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-yellow-600">Warning</div>
@@ -294,7 +293,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
           </div>
           <div className="text-2xl font-bold text-yellow-700">{stats.warning}</div>
         </div>
-        
+
         <div className="bg-purple-50 rounded-lg border border-purple-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-purple-600">Offline</div>
@@ -302,7 +301,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
           </div>
           <div className="text-2xl font-bold text-purple-700">{stats.byType?.offline || 0}</div>
         </div>
-        
+
         <div className="bg-orange-50 rounded-lg border border-orange-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-orange-600">Ink Issues</div>
@@ -439,11 +438,11 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700">Resolved</Badge>
                       )}
                     </div>
-                    
+
                     <p className="text-sm text-gray-600 mb-2">
                       {alert.message}
                     </p>
-                    
+
                     <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -502,7 +501,7 @@ export default function AlertCard({ onAlertSelect, selectedAlertId }) {
                           </DropdownMenuItem>
                         )}
                         {alert.status === 'active' && (
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-green-600"
                             onClick={(e) => handleResolve(e, alert)}
                           >

@@ -41,8 +41,21 @@ import {
   ChevronUp,
   Eye,
   Server,
-  Building2
+  Building2,
+  Trash2
 } from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -54,6 +67,8 @@ export default function AgentTable({ onAgentSelect, mode = "dashboard" }) {
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // Load agents list
   const loadAgents = async () => {
@@ -88,16 +103,14 @@ export default function AgentTable({ onAgentSelect, mode = "dashboard" }) {
 
   const handleViewDetails = (agentId, e) => {
     e.stopPropagation();
-    // ✅ DETAIL: redirect ke halaman agent
     router.push(`/agents/${agentId}`);
   };
 
-  // Auto select first agent ONLY in dashboard mode
   useEffect(() => {
     if (mode === "dashboard" && agents.length > 0 && !selectedAgentId) {
       handleSelect(agents[0].id);
     }
-  }, [agents, mode]); // ✅ tambah mode ke dependency
+  }, [agents, mode]);
 
   const filteredAgents = agents
     .filter(agent => {
@@ -131,6 +144,24 @@ export default function AgentTable({ onAgentSelect, mode = "dashboard" }) {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
+
+  const handleDelete = async (agentId, e) => {
+    e?.stopPropagation();
+    setDeletingId(agentId);
+    try {
+      const token = localStorage.getItem('jwt_token');
+      const res = await fetch(`${API_URL}/api/agents/${agentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAgents(prev => prev.filter(a => a.id !== agentId));
+    } catch (error) {
+      console.error('Failed to delete agent:', error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
@@ -282,23 +313,69 @@ export default function AgentTable({ onAgentSelect, mode = "dashboard" }) {
                       </TableCell>
 
                       <TableCell className="text-right">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={(e) => handleViewDetails(agent.id, e)}
-                              >
-                                <Eye className="h-3.5 w-3.5 text-gray-500" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" className="text-xs">
-                              View Details
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <div className="flex items-center justify-end gap-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => handleViewDetails(agent.id, e)}
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-gray-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">View Details</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={(e) => e.stopPropagation()}
+                                      disabled={deletingId === agent.id}
+                                    >
+                                      {deletingId === agent.id
+                                        ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                        : <Trash2 className="h-3.5 w-3.5 text-gray-500" />
+                                      }
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Agent</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete <strong>{agent.name}</strong>?
+                                        This will permanently remove the agent and all associated data.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-red-600 hover:bg-red-700"
+                                        onClick={(e) => handleDelete(agent.id, e)}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">
+                                {confirmDelete === agent.id ? 'Click again to confirm' : 'Delete Agent'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

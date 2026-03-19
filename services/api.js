@@ -96,6 +96,7 @@ export const api = {
   // ========== AGENTS ==========
   getAllAgents: () => fetchAPI('/api/agents'),
   getAgent: (agentId) => fetchAPI(`/api/agents/${agentId}`),
+  deleteAgent: (agentId) => fetchAPI(`/api/agents/${agentId}`, { method: 'DELETE' }),
 
   getAgentProfile: (agentToken) =>
     fetchAPI('/api/agents/agent/profile', {

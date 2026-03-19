@@ -32,6 +32,7 @@ import {
   Users,
   Bell,
 } from "lucide-react";
+import { useMemo } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -59,6 +60,35 @@ export default function DashboardPage() {
     getAllPrintersStatistics,
   } = usePrinterStore();
 
+  // ALERT STORE
+  const {
+    alerts,
+    unreadCount,
+    generateAlertsFromPrinters,
+    initWebSocket,
+    cleanup,
+    markAllAsRead
+  } = useAlertStore();
+
+  const stats = useMemo(() => {
+    return {
+      total: allPrinters.length,
+      online: allPrinters.filter(p =>
+        ['READY', 'ONLINE', 'PRINTING'].includes(p.status)
+      ).length,
+      offline: allPrinters.filter(p =>
+        ['OFFLINE', 'DISCONNECTED', 'OTHER', 'ERROR'].includes(p.status)
+      ).length,
+      lowInk: alerts.filter(a => a.type === 'low_ink' && a.status === 'active').length,
+      criticalInk: alerts.filter(a =>
+        (a.type === 'no_ink' || a.type === 'offline' || a.type === 'paper_jam') &&
+        a.severity === 'critical' &&
+        a.status === 'active'
+      ).length,
+      pagesToday: allPrinters.reduce((sum, p) => sum + (p.pages_today || 0), 0)
+    };
+  }, [allPrinters, alerts]);
+
   // STATS STORE
   const {
     agentStats,
@@ -79,16 +109,6 @@ export default function DashboardPage() {
     fetchDailyReportToday,
   } = useReportStore();
 
-  // ALERT STORE
-  const {
-    alerts,
-    unreadCount,
-    generateAlertsFromPrinters,
-    initWebSocket,
-    cleanup,
-    markAllAsRead
-  } = useAlertStore();
-
   // LOCAL UI STATE
   const [activeTab, setActiveTab] = useState("overview");
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -107,29 +127,6 @@ export default function DashboardPage() {
   // GETTERS
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const overviewPrinters = selectedAgent ? (agentPrinters[selectedAgentId] || []) : [];
-
-  // Stats dari printer store
-  const allPrintersStats = getAllPrintersStatistics?.() || {
-    total: 0,
-    online: 0,
-    offline: 0,
-    error: 0,
-    printing: 0,
-    lowInk: 0,
-    criticalInk: 0,
-    totalPagesToday: 0
-  };
-
-  // Stats untuk cards
-  const stats = {
-    total: allPrintersStats.total,
-    online: allPrintersStats.online,
-    offline: allPrintersStats.offline + allPrintersStats.error,
-    lowInk: allPrintersStats.lowInk,
-    criticalInk: allPrintersStats.criticalInk,
-    pagesToday: allPrintersStats.totalPagesToday
-  };
-
 
   // AUTH CHECK
   useEffect(() => {
@@ -172,12 +169,6 @@ export default function DashboardPage() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    console.log('🔄 allPrinters BERUBAH:', {
-      length: allPrinters.length,
-      data: allPrinters,
-      firstPrinter: allPrinters[0]
-    });
-
     if (allPrinters.length > 0) {
       console.log('📋 SEMUA PROPERTI PRINTER:', Object.keys(allPrinters[0]));
       console.log('📋 VALUE PRINTER:', JSON.stringify(allPrinters[0], null, 2));
@@ -189,7 +180,6 @@ export default function DashboardPage() {
 
 
       const stats = getAllPrintersStatistics();
-      console.log('📊 stats setelah update:', stats);
     }
   }, [allPrinters]);
 
@@ -325,7 +315,7 @@ export default function DashboardPage() {
 
               {activeTab === "printers" && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Total {allPrintersStats.total} printers across all agents
+                  Total {stats.total} printers across all agents
                 </p>
               )}
 

@@ -335,10 +335,10 @@ function DailyReportView({ agents }) {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <StatCard label="Total Pages" value={rangeSummary.totalPages.toLocaleString()} color="blue" />
-                        <StatCard label="Avg / Day" value={rangeSummary.averagePages.toLocaleString()} sub="Pages per day" color="green" />
-                        <StatCard label="Peak Day" value={rangeSummary.maxPages.toLocaleString()} sub="Highest volume" color="orange" />
-                        <StatCard label="Lowest Day" value={rangeSummary.minPages.toLocaleString()} sub="Lowest volume" color="purple" />
+                        <StatCard label="Total Pages" value={rangeSummary.totalPages.toLocaleString()} color="white" />
+                        <StatCard label="Avg / Day" value={rangeSummary.averagePages.toLocaleString()} sub="Pages per day" color="white" />
+                        <StatCard label="Peak Day" value={rangeSummary.maxPages.toLocaleString()} sub="Highest volume" color="white" />
+                        <StatCard label="Lowest Day" value={rangeSummary.minPages.toLocaleString()} sub="Lowest volume" color="white" />
                     </div>
 
                     {/* Chart */}
