@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Printer, 
-  Wifi, 
+import {
+  Printer,
+  Wifi,
   WifiOff,
   Droplets,
   FileText,
@@ -38,7 +38,7 @@ export default function PrinterDetailModal({ printer, isOpen, onClose }) {
   // Dapatkan status printer yang benar
   const getPrinterStatus = () => {
     const status = printer.status?.toUpperCase();
-    
+
     if (status === 'READY' || status === 'ONLINE' || status === 'PRINTING') {
       return {
         label: status,
@@ -145,26 +145,47 @@ export default function PrinterDetailModal({ printer, isOpen, onClose }) {
               <div className="space-y-2">
                 {Object.entries(inkLevels).map(([color, level]) => {
                   const inkStatus = getInkStatus(color, level);
+
+                  const inkColorHex = {
+                    black: "#1a1a1a",
+                    cyan: "#06b6d4",
+                    magenta: "#ec4899",
+                    yellow: "#eab308",
+                    photoBlack: "#4b5563",
+                    gray: "#9ca3af",
+                  }[color] || "#6b7280";
+
+                  const barColor = inkStatus === 'critical' ? '#ef4444'
+                    : inkStatus === 'low' ? '#f59e0b'
+                      : inkColorHex;
+
+                  const textColor = inkStatus === 'critical' ? '#dc2626'
+                    : inkStatus === 'low' ? '#d97706'
+                      : '#374151';
+
                   return (
                     <div key={color}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="capitalize">{color}</span>
-                        <span className={
-                          inkStatus === 'critical' ? 'text-red-600' : 
-                          inkStatus === 'low' ? 'text-yellow-600' : 
-                          'text-green-600'
-                        }>
+                      <div className="flex justify-between text-xs mb-1 items-center">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: inkColorHex }}
+                          />
+                          <span className="capitalize">{color}</span>
+                        </div>
+                        <span style={{ color: textColor }} className="font-medium">
                           {level}%
                         </span>
                       </div>
                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${
-                            inkStatus === 'critical' ? 'bg-red-500' : 
-                            inkStatus === 'low' ? 'bg-yellow-500' : 
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${level}%` }}
+                        <div
+                          style={{
+                            width: `${level}%`,
+                            backgroundColor: barColor,
+                            height: "100%",
+                            borderRadius: "9999px",
+                            transition: "width 0.3s ease"
+                          }}
                         />
                       </div>
                     </div>

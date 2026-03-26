@@ -217,18 +217,44 @@ export default function PrinterCard({ printer, agent, onPause, onResume }) {
                 const colorName = color.charAt(0).toUpperCase() + color.slice(1);
                 const isLow = level < 20;
 
+                // Pakai inline style, bukan Tailwind class dinamis
+                const inkColorHex = {
+                  black: "#1a1a1a",
+                  cyan: "#06b6d4",
+                  magenta: "#ec4899",
+                  yellow: "#eab308",
+                  photoBlack: "#4b5563",
+                  gray: "#9ca3af",
+                }[color] || "#6b7280";
+
+                const barColor = isLow ? "#ef4444" : inkColorHex;
+
                 return (
                   <div key={color} className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">{colorName}</span>
-                      <span className={`font-medium ${isLow ? 'text-gray-900' : 'text-gray-700'}`}>
+                    <div className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: inkColorHex }}
+                        />
+                        <span className="text-gray-600">{colorName}</span>
+                      </div>
+                      <span style={{ color: isLow ? "#ef4444" : "#374151" }} className="font-medium">
                         {level}%
                       </span>
                     </div>
-                    <Progress
-                      value={level}
-                      className={`h-1.5 bg-gray-100 [&>div]:${isLow ? 'bg-gray-600' : 'bg-gray-900'}`} 
-                    />
+                    {/* Pakai inline style bukan Tailwind class dinamis */}
+                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        style={{
+                          width: `${level}%`,
+                          backgroundColor: barColor,
+                          height: "100%",
+                          borderRadius: "9999px",
+                          transition: "width 0.3s ease"
+                        }}
+                      />
+                    </div>
                   </div>
                 );
               })}

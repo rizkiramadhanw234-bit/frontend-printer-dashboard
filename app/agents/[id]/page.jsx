@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import {
     Tooltip,
     TooltipContent,
@@ -203,29 +202,48 @@ export default function AgentDetailPage() {
                                 const isLow = level < 20;
                                 const isCritical = level < 10;
 
+                                const inkColorHex = {
+                                    black: "#1a1a1a",
+                                    cyan: "#06b6d4",
+                                    magenta: "#ec4899",
+                                    yellow: "#eab308",
+                                    photoBlack: "#4b5563",
+                                    gray: "#9ca3af",
+                                }[color] || "#6b7280";
+
+                                const barColor = isCritical ? "#dc2626"
+                                    : isLow ? "#f97316"
+                                        : inkColorHex;
+
                                 return (
-                                    <Fragment key={`${printer.id}-${color}`}>
-                                        <div key={color} className="space-y-1">
-                                            <div className="flex justify-between text-xs">
+                                    <div key={color} className="space-y-1">
+                                        <div className="flex justify-between text-xs">
+                                            <div className="flex items-center gap-1.5">
+                                                <span
+                                                    className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: inkColorHex }}
+                                                />
                                                 <span className="text-gray-600">{colorName}</span>
-                                                <span className={`font-medium ${isCritical ? 'text-red-600' :
-                                                    isLow ? 'text-orange-600' :
-                                                        'text-gray-700'
-                                                    }`}>
-                                                    {level}%
-                                                </span>
                                             </div>
-                                            <Progress
-                                                value={level}
-                                                className={`
-                                            h-1.5 bg-gray-100
-                                            ${isCritical ? '[&>div]:bg-red-600' : ''}
-                                            ${isLow && !isCritical ? '[&>div]:bg-orange-500' : ''}
-                                            ${!isLow && !isCritical ? '[&>div]:bg-green-600' : ''}
-                                        `}
+                                            <span
+                                                className="font-medium"
+                                                style={{ color: isCritical ? "#dc2626" : isLow ? "#f97316" : "#374151" }}
+                                            >
+                                                {level}%
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                                            <div
+                                                style={{
+                                                    width: `${level}%`,
+                                                    backgroundColor: barColor,
+                                                    height: "100%",
+                                                    borderRadius: "9999px",
+                                                    transition: "width 0.3s ease"
+                                                }}
                                             />
                                         </div>
-                                    </Fragment>
+                                    </div>
                                 );
                             })}
                         </div>

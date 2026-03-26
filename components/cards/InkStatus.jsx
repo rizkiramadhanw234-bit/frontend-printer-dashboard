@@ -87,9 +87,23 @@ export default function InkStatus({ printer }) {
           if (level === null) return null;
 
           const status = getColorProgress(color, level);
-          const statusClass = status === "destructive" ? "text-red-600" :
-            status === "warning" ? "text-amber-600" :
-              "text-green-600";
+
+          const inkColorHex = {
+            black: "#1a1a1a",
+            cyan: "#06b6d4",
+            magenta: "#ec4899",
+            yellow: "#eab308",
+            photoBlack: "#4b5563",
+            gray: "#9ca3af",
+          }[color] || "#6b7280";
+
+          const barColor = status === "destructive" ? "#ef4444"
+            : status === "warning" ? "#f59e0b"
+              : inkColorHex;
+
+          const textColor = status === "destructive" ? "#dc2626"
+            : status === "warning" ? "#d97706"
+              : "#16a34a";
 
           return (
             <Card key={color} className="h-full">
@@ -97,7 +111,7 @@ export default function InkStatus({ printer }) {
                 <div className="flex items-center gap-4">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: getColorHex(color) }}
+                    style={{ backgroundColor: inkColorHex }}
                   >
                     <span className="text-white text-sm font-bold">
                       {getColorName(color).charAt(0)}
@@ -107,17 +121,23 @@ export default function InkStatus({ printer }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-2">
                       <p className="font-medium text-sm truncate">{getColorName(color)}</p>
-                      <p className={`font-bold text-lg ${statusClass}`}>{level}%</p>
+                      <p className="font-bold text-lg" style={{ color: textColor }}>
+                        {level}%
+                      </p>
                     </div>
-                    <Progress
-                      value={level}
-                      className={`
-                            h-2
-                            ${status === "destructive" ? "[&>div]:bg-red-500" : ""}
-                            ${status === "warning" ? "[&>div]:bg-amber-500" : ""}
-                            ${status === "default" ? "[&>div]:bg-green-500" : ""}
-                          `}
-                    />
+
+                    {/* Ganti <Progress> pakai div manual */}
+                    <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        style={{
+                          width: `${level}%`,
+                          backgroundColor: barColor,
+                          height: "100%",
+                          borderRadius: "9999px",
+                          transition: "width 0.3s ease"
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
