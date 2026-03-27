@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "../services/api";
-import { useAppStore } from "./app.store"; 
+import { useAppStore } from "./app.store";
 
 export const usePrinterStore = create((set, get) => ({
     // ========== STATE ==========
@@ -161,27 +161,27 @@ export const usePrinterStore = create((set, get) => ({
         }
     },
 
-    // ========== PRINTER CONTROL (PAKAI API KEY) ==========
+    // ========== PRINTER CONTROL ==========
 
     pausePrinter: async (agentId, printerName) => {
-        try {
-            const appState = useAppStore.getState();
-            const apiKey = appState.agentsWithKeys?.[agentId];
+        const appState = useAppStore.getState();
+        let apiKey = appState.agentsWithKeys?.[agentId];
 
-            if (!apiKey) throw new Error('API key not found');
-
-            const response = await api.pausePrinter(agentId, printerName, apiKey);
-
-            // Refresh printer data after pause
-            await get().fetchAgentPrinter(agentId, printerName);
-
-            console.log(`✅ Paused printer ${printerName}`);
-            return response;
-
-        } catch (error) {
-            console.error(`Failed to pause printer ${printerName}:`, error);
-            throw error;
+        // Auto-fetch API key
+        if (!apiKey) {
+            const keyRes = await api.getAgentApiKey(agentId);
+            apiKey = keyRes.apiKey;
+            useAppStore.setState(state => ({
+                agentsWithKeys: {
+                    ...(state.agentsWithKeys || {}),
+                    [agentId]: apiKey
+                }
+            }));
         }
+
+        const response = await api.pausePrinter(agentId, printerName, apiKey);
+        await get().fetchAllPrinters();
+        return response;
     },
 
     resumePrinter: async (agentId, printerName) => {
