@@ -52,16 +52,40 @@ export default function PrinterDetailModal({ printer, isOpen, onClose }) {
   const bwRatioLifetime = totalPrintedLifetime > 0 ? 100 - colorRatioLifetime : 0;
 
   const getPrinterStatus = () => {
+    const detail = printer.printer_status_detail || printer.printerStatusDetail;
+
+    const detailLabelMap = {
+      'out_of_paper': 'Out of Paper',
+      'paper_jam': 'Paper Jam',
+      'door_open': 'Door Open',
+      'user_intervention': 'User Intervention',
+      'low_ink': 'Low Ink',
+      'no_ink': 'No Ink',
+      'offline': 'Offline',
+      'paused': 'Paused',
+      'printing': 'Printing',
+      'ready': 'Ready',
+    };
+
+    // Prioritaskan detail status
+    if (detail && detailLabelMap[detail]) {
+      const isError = ['out_of_paper', 'paper_jam', 'door_open', 'user_intervention', 'no_ink'].includes(detail);
+      return {
+        label: detailLabelMap[detail],
+        variant: isError ? 'destructive' : 'secondary',
+        icon: isError
+          ? <WifiOff className="h-4 w-4 text-red-500" />
+          : <Wifi className="h-4 w-4 text-yellow-500" />
+      };
+    }
+
     const status = (printer.status || printer.printerStatus)?.toUpperCase();
-    if (["READY", "ONLINE", "PRINTING"].includes(status)) {
+    if (["READY", "ONLINE", "PRINTING"].includes(status))
       return { label: status, variant: "default", icon: <Wifi className="h-4 w-4 text-green-500" /> };
-    }
-    if (status === "PAUSED") {
+    if (status === "PAUSED")
       return { label: "Paused", variant: "secondary", icon: <Wifi className="h-4 w-4 text-yellow-500" /> };
-    }
-    if (["OTHER", "ERROR"].includes(status)) {
+    if (["OTHER", "ERROR"].includes(status))
       return { label: "Error", variant: "destructive", icon: <WifiOff className="h-4 w-4 text-red-500" /> };
-    }
     return { label: status || "Unknown", variant: "secondary", icon: <WifiOff className="h-4 w-4 text-gray-400" /> };
   };
 

@@ -78,16 +78,20 @@ export default function AgentDetailPage() {
         });
     };
 
-    const getStatusColor = (status) => {
-        const s = status?.toLowerCase();
-        if (s === 'online' || s === 'ready') return 'bg-gray-900';
-        if (s === 'offline') return 'bg-gray-400';
-        if (s === 'error') return 'bg-red-500';
-        if (s === 'paused') return 'bg-gray-500';
-        return 'bg-gray-300';
-    };
-
-    const getStatusText = (status) => {
+    const getStatusText = (status, detailStatus) => {
+        const detailLabelMap = {
+            'out_of_paper': 'Out of Paper',
+            'paper_jam': 'Paper Jam',
+            'door_open': 'Door Open',
+            'user_intervention': 'User Intervention',
+            'low_ink': 'Low Ink',
+            'no_ink': 'No Ink',
+            'offline': 'Offline',
+            'paused': 'Paused',
+            'printing': 'Printing',
+            'ready': 'Ready',
+        };
+        if (detailStatus && detailLabelMap[detailStatus]) return detailLabelMap[detailStatus];
         const s = status?.toLowerCase();
         if (s === 'online' || s === 'ready') return 'Online';
         if (s === 'offline') return 'Offline';
@@ -96,10 +100,23 @@ export default function AgentDetailPage() {
         return status || 'Unknown';
     };
 
+    const getStatusColor = (status, detailStatus) => {
+        const errorDetails = ['out_of_paper', 'paper_jam', 'door_open', 'user_intervention', 'no_ink'];
+        if (errorDetails.includes(detailStatus)) return 'bg-red-500';
+        if (detailStatus === 'low_ink') return 'bg-yellow-500';
+        const s = status?.toLowerCase();
+        if (s === 'online' || s === 'ready') return 'bg-gray-900';
+        if (s === 'offline') return 'bg-gray-400';
+        if (s === 'error') return 'bg-red-500';
+        if (s === 'paused') return 'bg-gray-500';
+        return 'bg-gray-300';
+    };
+
     // ─── Printer Card ─────────────────────────────────────────────────────────
     const PrinterCard = ({ printer }) => {
         const hasInkData = printer.inkLevels && Object.keys(printer.inkLevels).length > 0;
         const isOnline = printer.status === 'ready' || printer.status === 'online';
+        const detail = printer.printerStatusDetail || printer.printer_status_detail;
 
         // Normalize field names (camelCase from new API, snake_case fallback)
         const pagesToday = printer.pagesToday ?? printer.pages_today ?? 0;
@@ -133,8 +150,8 @@ export default function AgentDetailPage() {
                                 </h4>
                                 <div className="flex items-center gap-2 mt-1">
                                     <div className="flex items-center gap-1">
-                                        <div className={`h-1.5 w-1.5 rounded-full ${getStatusColor(printer.status)}`} />
-                                        <span className="text-xs text-gray-500">{getStatusText(printer.status)}</span>
+                                        <div className={`h-1.5 w-1.5 rounded-full ${getStatusColor(printer.status, detail)}`} />
+                                        <span className="text-xs text-gray-500">{getStatusText(printer.status, detail)}</span>
                                     </div>
                                     {printer.isNetwork && (
                                         <Badge variant="outline" className="text-[10px] h-4 px-1.5 gap-0.5">

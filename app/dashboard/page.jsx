@@ -33,6 +33,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useMemo } from "react";
+import wsService from "@/services/ws";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -198,6 +199,30 @@ export default function DashboardPage() {
       fetchDailyReportToday(selectedAgentId);
     }
   }, [selectedAgentId, fetchAgentPrinters, fetchDailyReportToday]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
+      if (data.type === 'printer_update') {
+        console.log('🔄 WS printer_update → refreshing printers...');
+        await fetchAllPrinters();
+      }
+    });
+
+    const unsubAgents = wsService.subscribeToAgents(async (data) => {
+      if (data.type === 'agent_disconnected') {
+        console.log('🔌 WS agent_disconnected → refreshing printers...');
+        await fetchAllPrinters();
+        await loadAgents();
+      }
+    });
+
+    return () => {
+      unsubPrinters?.();
+      unsubAgents?.();
+    };
+  }, [isAuthenticated]);
 
   // Auto-select first agent
   useEffect(() => {

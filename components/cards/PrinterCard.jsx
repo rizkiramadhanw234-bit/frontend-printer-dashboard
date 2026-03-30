@@ -42,7 +42,7 @@ export default function PrinterCard({ printer, agent, onPause, onResume }) {
       </Card>
     );
   }
-
+  const detail = printer.printer_status_detail || printer.printerStatusDetail;
   const isOnline = printer.status === "READY" || printer.status === "ready" || printer.status === "online";
   const isPaused = printer.status === "paused" || printer.status === "PAUSED";
 
@@ -58,6 +58,27 @@ export default function PrinterCard({ printer, agent, onPause, onResume }) {
   const totalPrintedToday = colorPagesToday + bwPagesToday;
   const colorRatio = totalPrintedToday > 0 ? Math.round((colorPagesToday / totalPrintedToday) * 100) : 0;
   const bwRatio = totalPrintedToday > 0 ? 100 - colorRatio : 0;
+
+  const detailLabelMap = {
+    'out_of_paper': 'Out of Paper',
+    'paper_jam': 'Paper Jam',
+    'door_open': 'Door Open',
+    'user_intervention': 'User Intervention',
+  };
+
+  const getStatusLabel = () => {
+    if (detail && detailLabelMap[detail]) return detailLabelMap[detail];
+    if (isPaused) return 'Paused';
+    if (isOnline) return 'Online';
+    return 'Offline';
+  };
+
+  const getStatusVariant = () => {
+    if (detail && detailLabelMap[detail]) return 'destructive';
+    if (isPaused) return 'secondary';
+    if (isOnline) return 'default';
+    return 'secondary';
+  };
 
   const handlePause = async () => {
     setLoading(true);
@@ -92,11 +113,8 @@ export default function PrinterCard({ printer, agent, onPause, onResume }) {
                   {printer.displayName || printer.display_name || printer.name}
                 </CardTitle>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge
-                    variant={isOnline ? "default" : "secondary"}
-                    className="text-[10px] h-5 px-2"
-                  >
-                    {isPaused ? "Paused" : isOnline ? "Online" : "Offline"}
+                  <Badge variant={getStatusVariant()} className="text-[10px] h-5 px-2">
+                    {getStatusLabel()}
                   </Badge>
                   {(printer.isNetwork || printer.is_network) && (
                     <Badge variant="outline" className="text-[10px] h-5 px-2 gap-1">

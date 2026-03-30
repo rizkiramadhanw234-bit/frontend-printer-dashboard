@@ -262,7 +262,6 @@ export const usePrinterStore = create((set, get) => ({
             p.status === "PRINTING" || p.printer_status_detail === 'printing'
         ).length;
 
-        // 🔥 HITUNG LOW INK - PAKAI snake_case!
         const lowInk = printers.filter(p => {
             if (p.printer_status_detail === 'low_ink') return true;
             if (p.lowInkColors && p.lowInkColors.length > 0) {
@@ -276,7 +275,6 @@ export const usePrinterStore = create((set, get) => ({
             return false;
         }).length;
 
-        // 🔥 HITUNG CRITICAL INK - PAKAI snake_case!
         const criticalInk = printers.filter(p => {
             if (p.printer_status_detail === 'no_ink') return true;
 
@@ -338,6 +336,32 @@ export const usePrinterStore = create((set, get) => ({
         };
     },
 
+    setupWebSocketSync: () => {
+        const wsService = require('../services/ws').default;
+
+        // Subscribe ke printer update dari WebSocket
+        const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
+            if (data.type === 'printer_update') {
+                console.log('🔄 WS printer_update received, refreshing...');
+                await get().fetchAllPrinters();
+            }
+        });
+
+        // Subscribe ke agent disconnect
+        const unsubAgents = wsService.subscribeToAgents(async (data) => {
+            if (data.type === 'agent_disconnected') {
+                console.log('🔌 WS agent_disconnected, refreshing printers...');
+                await get().fetchAllPrinters();
+            }
+        });
+
+        // Return cleanup
+        return () => {
+            unsubPrinters?.();
+            unsubAgents?.();
+        };
+    },
+
     // ========== UTILS ==========
 
     refresh: async () => {
@@ -361,3 +385,4 @@ export const usePrinterStore = create((set, get) => ({
         });
     }
 }));
+
