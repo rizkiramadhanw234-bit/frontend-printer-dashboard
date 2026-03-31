@@ -43,23 +43,16 @@ async function fetchAPI(endpoint, options = {}) {
 
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
-      console.log(`🔑 Using API key for agent ${agentId}`);
-    } else {
-      console.error(`❌ No API key found for agent ${agentId}`);
-    }
+    } else { }
   }
-
-  console.log(`🌐 Fetching: ${url} with auth: ${authType}`);
 
   try {
     const res = await fetch(url, { headers, ...options });
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error(`❌ API Error ${res.status}:`, errorText);
 
       if (res.status === 401) {
-        console.log('JWT token invalid');
         localStorage.removeItem('jwt_token');
       }
 
@@ -67,11 +60,9 @@ async function fetchAPI(endpoint, options = {}) {
     }
 
     const data = await res.json();
-    console.log(`✅ API Success:`, endpoint.substring(0, 50), data);
     return data;
 
   } catch (error) {
-    console.error(`❌ Network error for ${url}:`, error);
     throw error;
   }
 }

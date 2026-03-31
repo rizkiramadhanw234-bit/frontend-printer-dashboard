@@ -33,17 +33,9 @@ export default function Login() {
     setErrorMessage("");
     try {
       const res = await login(email, password);
-      console.log('Login result:', res);
 
       if (res.success) {
-        // Cek token tersimpan gak
-        console.log('Token di localStorage:', localStorage.getItem('jwt_token'));
-        console.log('Auth state:', useAuthStore.getState());
-
-        // Tunggu sebentar sebelum redirect
         await new Promise(r => setTimeout(r, 500));
-
-        console.log('Auth state setelah delay:', useAuthStore.getState());
         router.push("/dashboard");
       } else {
         setErrorMessage("Email atau password salah");

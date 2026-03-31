@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { api } from "../services/api";
 
 export const useReportStore = create((set, get) => ({
-  // ========== STATE ==========
+  // STATE 
 
   // Daily Reports
   dailyReport: null,
@@ -30,7 +30,7 @@ export const useReportStore = create((set, get) => ({
     endDate: null
   },
 
-  // ========== DAILY REPORTS ==========
+  // DAILY REPORTS 
 
   fetchDailyReport: async (params = {}) => {
     try {
@@ -66,7 +66,7 @@ export const useReportStore = create((set, get) => ({
     return get().fetchDailyReport({ date: today, agentId });
   },
 
-  // ========== MONTHLY REPORTS ==========
+  // MONTHLY REPORTS 
 
   fetchMonthlyReport: async (year, month, params = {}) => {
     try {
@@ -111,7 +111,7 @@ export const useReportStore = create((set, get) => ({
     return get().monthlyReportHistory[reportKey];
   },
 
-  // ========== COMPANY REPORTS ==========
+  // COMPANY REPORTS 
 
   fetchCompanyReport: async (companyId, params = {}) => {
     try {
@@ -127,7 +127,6 @@ export const useReportStore = create((set, get) => ({
         isLoading: false
       }));
 
-      console.log(`✅ Loaded company report for ${companyId}`);
       return response;
 
     } catch (error) {
@@ -144,7 +143,7 @@ export const useReportStore = create((set, get) => ({
     return get().companyReports[companyId];
   },
 
-  // ========== PRINTER LIFETIME REPORTS ==========
+  // PRINTER LIFETIME REPORTS 
 
   fetchPrinterLifetimeReport: async (printerName) => {
     try {
@@ -160,7 +159,6 @@ export const useReportStore = create((set, get) => ({
         isLoading: false
       }));
 
-      console.log(`✅ Loaded lifetime report for ${printerName}`);
       return response;
 
     } catch (error) {
@@ -177,7 +175,7 @@ export const useReportStore = create((set, get) => ({
     return get().printerLifetimeReports[printerName];
   },
 
-  // ========== EXPORT ==========
+  // EXPORT 
 
   exportDailyReport: async (date) => {
     try {
@@ -209,7 +207,7 @@ export const useReportStore = create((set, get) => ({
     }
   },
 
-  // ========== ANALYSIS HELPERS ==========
+  // ANALYSIS HELPERS 
 
   getDailyReportSummary: () => {
     const report = get().dailyReport;
@@ -267,7 +265,7 @@ export const useReportStore = create((set, get) => ({
     }));
   },
 
-  // ========== FILTERS ==========
+  // FILTERS 
 
   setFilters: (newFilters) => {
     set(state => ({
@@ -287,7 +285,7 @@ export const useReportStore = create((set, get) => ({
     });
   },
 
-  // ========== UTILS ==========
+  //  UTILS 
 
   reset: () => {
     set({

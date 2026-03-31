@@ -2,36 +2,30 @@ import { create } from "zustand";
 import { api } from "../services/api";
 
 export const useStatsStore = create((set, get) => ({
-  // ========== STATE ==========
-  
   agentStats: null,
   printStats: [],
-  
+
   isLoading: false,
   error: null,
-  
+
   lastUpdated: null,
 
-  // ========== AGENT STATS ==========
-  
   fetchAgentStats: async () => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getAgentStats();
-      
-      set({ 
+
+      set({
         agentStats: response.stats,
         lastUpdated: new Date().toISOString(),
-        isLoading: false 
+        isLoading: false
       });
 
-      console.log('✅ Loaded agent stats');
       return response.stats;
-      
+
     } catch (error) {
-      console.error("Failed to fetch agent stats:", error);
-      set({ 
+      set({
         error: error.message,
         isLoading: false,
         agentStats: null
@@ -40,26 +34,22 @@ export const useStatsStore = create((set, get) => ({
     }
   },
 
-  // ========== PRINT STATS ==========
-  
   fetchPrintStats: async () => {
     try {
       set({ isLoading: true, error: null });
-      
+
       const response = await api.getPrintStats();
-      
-      set({ 
+
+      set({
         printStats: response.stats || [],
         lastUpdated: new Date().toISOString(),
-        isLoading: false 
+        isLoading: false
       });
 
-      console.log(`✅ Loaded ${response.count} print stats`);
       return response.stats;
-      
+
     } catch (error) {
-      console.error("Failed to fetch print stats:", error);
-      set({ 
+      set({
         error: error.message,
         isLoading: false,
         printStats: []
@@ -68,27 +58,22 @@ export const useStatsStore = create((set, get) => ({
     }
   },
 
-  // ========== LOAD ALL STATS ==========
-  
   fetchAllStats: async () => {
     try {
       set({ isLoading: true, error: null });
-      
+
       await Promise.all([
         get().fetchAgentStats(),
         get().fetchPrintStats()
       ]);
-      
+
       set({ isLoading: false });
-      
+
     } catch (error) {
-      console.error("Failed to fetch all stats:", error);
       set({ isLoading: false });
     }
   },
 
-  // ========== GETTERS ==========
-  
   getAgentStatsSummary: () => {
     const stats = get().agentStats;
     if (!stats) return null;
@@ -115,14 +100,14 @@ export const useStatsStore = create((set, get) => ({
       pages: parseInt(stat.totalPages) || 0,
       agents: stat.uniqueAgents || 0,
       printers: stat.uniquePrinters || 0
-    })).reverse(); // Reverse untuk chronological order
+    })).reverse();
   },
 
   getTotalPagesAllTime: () => {
     const stats = get().printStats;
     if (!stats || stats.length === 0) return 0;
 
-    return stats.reduce((total, stat) => 
+    return stats.reduce((total, stat) =>
       total + (parseInt(stat.totalPages) || 0), 0
     );
   },
@@ -131,7 +116,7 @@ export const useStatsStore = create((set, get) => ({
     const stats = get().printStats;
     if (!stats || stats.length === 0) return 0;
 
-    return stats.reduce((total, stat) => 
+    return stats.reduce((total, stat) =>
       total + (stat.totalPrints || 0), 0
     );
   },
@@ -151,8 +136,6 @@ export const useStatsStore = create((set, get) => ({
     const totalPrints = get().getTotalPrintsAllTime();
     return Math.round(totalPrints / stats.length);
   },
-
-  // ========== UTILS ==========
 
   refresh: async () => {
     await get().fetchAllStats();

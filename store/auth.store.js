@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "../services/api";
-import { persist, createJSONStorage } from "zustand/middleware"; 
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export const useAuthStore = create(
   persist(
@@ -16,8 +16,6 @@ export const useAuthStore = create(
         try {
           set({ isLoading: true, error: null });
           const response = await api.login(email, password);
-          console.log("Login response:", response);
-
           const token = response.token || response.data?.token;
           const user = response.user || response.data?.user;
 
@@ -49,7 +47,6 @@ export const useAuthStore = create(
 
       checkAuth: async () => {
         const token = localStorage.getItem('jwt_token');
-        console.log('checkAuth called, token:', token ? 'ada' : 'TIDAK ADA');
 
         if (!token) {
           set({ isAuthenticated: false, isInitialized: true });
@@ -58,7 +55,6 @@ export const useAuthStore = create(
 
         try {
           const response = await api.checkAuth();
-          console.log('checkAuth response:', response);
 
           if (response.success) {
             set({ isAuthenticated: true, token, user: response.user || response.data?.user, isInitialized: true });

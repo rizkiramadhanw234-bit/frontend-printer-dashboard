@@ -64,15 +64,12 @@ export default function AgentTable({ onAgentSelect }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Load agents on mount
   useEffect(() => {
     fetchAllAgents();
   }, [fetchAllAgents]);
 
-  // Filter and sort agents
   const filteredAgents = agents
     .filter(agent => {
-      // Search filter
       if (searchText) {
         const searchLower = searchText.toLowerCase();
         return (
@@ -85,18 +82,15 @@ export default function AgentTable({ onAgentSelect }) {
       return true;
     })
     .filter(agent => {
-      // Status filter
       if (statusFilter === "all") return true;
       return agent.status === statusFilter;
     })
     .sort((a, b) => {
-      // Sorting
       if (!sortConfig.key) return 0;
 
       let aValue = a[sortConfig.key];
       let bValue = b[sortConfig.key];
 
-      // Special handling for dates
       if (sortConfig.key === 'lastSeen') {
         aValue = new Date(a.lastSeen || 0);
         bValue = new Date(b.lastSeen || 0);
@@ -135,15 +129,6 @@ export default function AgentTable({ onAgentSelect }) {
       <ChevronUp className="h-3 w-3 ml-1" /> :
       <ChevronDown className="h-3 w-3 ml-1" />;
   };
-
-  // const getStatusVariant = (status) => {
-  //   switch (status?.toLowerCase()) {
-  //     case 'online': return 'default';
-  //     case 'offline': return 'secondary';
-  //     case 'error': return 'destructive';
-  //     default: return 'outline';
-  //   }
-  // };
 
   return (
     <Card>
@@ -282,13 +267,8 @@ export default function AgentTable({ onAgentSelect }) {
                   const isSelected = selectedAgentId === agent.agentId;
                   const lastSeen = agent.lastSeen ? new Date(agent.lastSeen) : null;
                   const timeAgo = lastSeen
-                    // eslint-disable-next-line react-hooks/purity
                     ? `${Math.floor((Date.now() - lastSeen.getTime()) / (1000 * 60))}m ago`
                     : "Unknown";
-
-                  console.log('Agent:', agent.agentId, 'Last seen:', timeAgo);
-                  console.log('Agent lastSeen:', agent.lastSeen);
-                  console.log('Agent lastSeen type:', typeof agent.lastSeen);
 
                   return (
                     <TableRow
@@ -303,10 +283,10 @@ export default function AgentTable({ onAgentSelect }) {
                             <TooltipTrigger asChild>
                               <div
                                 className={`h-3 w-3 rounded-full ${agent.status === "online"
-                                    ? "bg-green-500"
-                                    : agent.status === "offline"
-                                      ? "bg-gray-400"
-                                      : "bg-red-500"
+                                  ? "bg-green-500"
+                                  : agent.status === "offline"
+                                    ? "bg-gray-400"
+                                    : "bg-red-500"
                                   }`}
                               />
                             </TooltipTrigger>
@@ -394,7 +374,6 @@ export default function AgentTable({ onAgentSelect }) {
           </Table>
         </div>
 
-        {/* Summary footer */}
         <div className="flex flex-col sm:flex-row items-center justify-between mt-4 text-sm text-muted-foreground">
           <div>
             Showing {filteredAgents.length} of {agents.length} agents

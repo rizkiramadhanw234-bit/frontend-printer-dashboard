@@ -40,7 +40,6 @@ export default function DashboardPage() {
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // APP STORE
   const {
     agents,
     companies,
@@ -52,7 +51,6 @@ export default function DashboardPage() {
     selectedAgent: selectedAgentGetter,
   } = useAppStore();
 
-  // PRINTER STORE
   const {
     allPrinters,
     agentPrinters,
@@ -61,7 +59,6 @@ export default function DashboardPage() {
     getAllPrintersStatistics,
   } = usePrinterStore();
 
-  // ALERT STORE
   const {
     alerts,
     unreadCount,
@@ -90,27 +87,23 @@ export default function DashboardPage() {
     };
   }, [allPrinters, alerts]);
 
-  // STATS STORE
   const {
     agentStats,
     fetchAgentStats,
     fetchPrintStats,
   } = useStatsStore();
 
-  // SYSTEM STORE
   const {
     health,
     fetchHealth,
     fetchSystemInfo,
   } = useSystemStore();
 
-  // REPORT STORE
   const {
     dailyReport,
     fetchDailyReportToday,
   } = useReportStore();
 
-  // LOCAL UI STATE
   const [activeTab, setActiveTab] = useState("overview");
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
@@ -125,11 +118,9 @@ export default function DashboardPage() {
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
 
-  // GETTERS
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const overviewPrinters = selectedAgent ? (agentPrinters[selectedAgentId] || []) : [];
 
-  // AUTH CHECK
   useEffect(() => {
     const init = async () => {
       const authed = await checkAuth();
@@ -139,7 +130,6 @@ export default function DashboardPage() {
     init();
   }, [checkAuth, router]);
 
-  // INITIAL LOAD
   useEffect(() => {
     if (isAuthenticated) {
       const loadInitialData = async () => {
@@ -156,12 +146,11 @@ export default function DashboardPage() {
 
           const stats = getAllPrintersStatistics();
 
-
           if (allPrinters.length > 0) {
             generateAlertsFromPrinters(allPrinters, 'initial');
           }
         } catch (error) {
-          console.error('Failed to load initial data:', error);
+          // Error handled silently
         }
       };
 
@@ -171,28 +160,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (allPrinters.length > 0) {
-      console.log('📋 SEMUA PROPERTI PRINTER:', Object.keys(allPrinters[0]));
-      console.log('📋 VALUE PRINTER:', JSON.stringify(allPrinters[0], null, 2));
-
-      console.log('   printerStatusDetail:', allPrinters[0]?.printerStatusDetail);
-      console.log('   lowInkColors:', allPrinters[0]?.lowInkColors);
-      console.log('   printer_status_detail:', allPrinters[0]?.printer_status_detail);
-      console.log('   low_ink_colors:', allPrinters[0]?.low_ink_colors);
-
-
       const stats = getAllPrintersStatistics();
     }
   }, [allPrinters]);
 
-
-  // Generate alerts when printers update
   useEffect(() => {
     if (allPrinters.length > 0 && isAuthenticated) {
       generateAlertsFromPrinters(allPrinters, 'printer_update');
     }
   }, [allPrinters, isAuthenticated, generateAlertsFromPrinters]);
 
-  // Fetch agent printers when agent selected
   useEffect(() => {
     if (selectedAgentId) {
       fetchAgentPrinters(selectedAgentId);
@@ -205,14 +182,12 @@ export default function DashboardPage() {
 
     const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
       if (data.type === 'printer_update') {
-        console.log('🔄 WS printer_update → refreshing printers...');
         await fetchAllPrinters();
       }
     });
 
     const unsubAgents = wsService.subscribeToAgents(async (data) => {
       if (data.type === 'agent_disconnected') {
-        console.log('🔌 WS agent_disconnected → refreshing printers...');
         await fetchAllPrinters();
         await loadAgents();
       }
@@ -224,20 +199,18 @@ export default function DashboardPage() {
     };
   }, [isAuthenticated]);
 
-  // Auto-select first agent
   useEffect(() => {
     if (agents.length > 0 && !selectedAgentId) {
       setSelectedAgentId(agents[0].id);
     }
   }, [agents, selectedAgentId]);
 
-  // HANDLERS
   const handleSelectAgent = async (agentId) => {
     try {
       setSelectedAgentId(agentId);
       await selectAgent(agentId);
     } catch (error) {
-      console.error('Failed to select agent:', error);
+      // Error handled silently
     }
   };
 
@@ -286,7 +259,7 @@ export default function DashboardPage() {
         generateAlertsFromPrinters(allPrinters, 'refresh');
       }
     } catch (error) {
-      console.error('Refresh failed:', error);
+      // Error handled silently
     } finally {
       setIsRefreshing(false);
     }
@@ -318,7 +291,6 @@ export default function DashboardPage() {
 
       <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* HEADER */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
@@ -372,12 +344,10 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <>
               <StatsCards stats={stats} />
 
-              {/* Quick Alert Summary */}
               {alerts.length > 0 && (
                 <div className="bg-white rounded-lg border p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -421,7 +391,6 @@ export default function DashboardPage() {
               )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                {/* Left Column - Agent Selector & Daily Report */}
                 <div className="lg:col-span-1 space-y-6">
                   <div className="bg-white rounded-lg border p-4">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">
@@ -447,7 +416,6 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Right Column - Printers */}
                 <div className="lg:col-span-2">
                   {overviewPrinters.length > 0 ? (
                     <div className="space-y-4">
@@ -483,7 +451,6 @@ export default function DashboardPage() {
             </>
           )}
 
-          {/* PRINTERS TAB */}
           {activeTab === "printers" && (
             <PrinterTable
               onPrinterSelect={(printer) => {
@@ -494,7 +461,6 @@ export default function DashboardPage() {
             />
           )}
 
-          {/* AGENTS TAB */}
           {activeTab === "agents" && (
             <AgentTable
               mode="dashboard"
@@ -503,7 +469,6 @@ export default function DashboardPage() {
             />
           )}
 
-          {/* COMPANIES TAB */}
           {activeTab === "companies" && (
             <div className="bg-white rounded-lg border">
               <div className="p-6 border-b flex justify-between items-center">
@@ -589,7 +554,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* DEPARTMENTS TAB */}
           {activeTab === "departments" && (
             <div className="bg-white rounded-lg border p-12 text-center">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -609,7 +573,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ALERTS TAB */}
           {activeTab === "alerts" && (
             <AlertCard
               onAlertSelect={(alert) => setSelectedAlert(alert)}
@@ -617,12 +580,10 @@ export default function DashboardPage() {
             />
           )}
 
-          {/* REPORTS TAB */}
           {activeTab === "reports" && (
             <ReportView />
           )}
 
-          {/* SETTINGS TAB */}
           {activeTab === "settings" && (
             <div className="bg-white rounded-lg border p-12 text-center">
               <Settings className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -632,7 +593,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* MODALS */}
         <CompanyModal
           isOpen={isCompanyModalOpen}
           onClose={() => setIsCompanyModalOpen(false)}

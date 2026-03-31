@@ -16,39 +16,29 @@ class WebSocketService {
     this.isServerAvailable = true;
     this.lastConnectionAttempt = 0;
     this.MIN_CONNECTION_INTERVAL = 5000;
-    
-    // 🔥 Tambahkan untuk rate limiting
+
     this.lastMessageTime = 0;
     this.messageCount = 0;
   }
 
   async connect() {
-    console.log(`🔌 Connecting to: ${this.wsUrl}`);
-
-    // 🔥 FIX: Gunakan Date.now() bukan variabel 'now'
     const currentTime = Date.now();
-    
-    // ⚠️ CEK: Jangan reconnect terlalu sering
+
     if (currentTime - this.lastConnectionAttempt < this.MIN_CONNECTION_INTERVAL) {
-      console.log("⏸️ Skipping connect - too soon since last attempt");
       return;
     }
 
     this.lastConnectionAttempt = currentTime;
 
     if (this.isConnecting) {
-      console.log("⏳ Already connecting, skipping...");
       return;
     }
 
     if (this.socket?.readyState === WebSocket.OPEN) {
-      console.log("✅ Already connected, skipping...");
       return;
     }
 
-    // ⚠️ CEK: Stop jika sudah max attempts
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log("⏹️ Max reconnection attempts reached, stopping");
       this.isServerAvailable = false;
       return;
     }
@@ -57,18 +47,14 @@ class WebSocketService {
     this.isConnecting = true;
 
     try {
-      console.log(`🔌 Attempting to connect to Dashboard WebSocket: ${this.wsUrl}`);
       this.socket = new WebSocket(this.wsUrl);
 
       this.socket.onopen = () => {
-        console.log("✅ Dashboard WebSocket connected successfully");
         this.reconnectAttempts = 0;
         this.isConnecting = false;
 
-        // Start heartbeat
         this.startHeartbeat();
 
-        // Notify semua subscriber
         this.notifySubscribers("connection", {
           type: "connected",
           timestamp: new Date().toISOString(),
@@ -79,18 +65,11 @@ class WebSocketService {
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log(
-            "📨 WebSocket message received:",
-            data.type || data.event || 'data',
-          );
 
-          // ⚠️ RATE LIMITING: Skip jika terlalu banyak messages
           if (this.shouldSkipMessage()) {
-            console.log("⏸️ Skipping message - rate limit");
             return;
           }
 
-          // Handle berdasarkan event type dari backend
           if (data.event) {
             switch (data.event) {
               case "agent_connected":
@@ -113,38 +92,31 @@ class WebSocketService {
             }
           }
 
-          // Handle berdasarkan type (format dari backend kita)
           if (data.type) {
             switch (data.type) {
               case "agent_connected":
               case "agent_disconnected":
                 this.notifySubscribers("agents", data);
                 break;
-                
+
               case "printer_update":
               case "ink_update":
                 this.notifySubscribers("printers", data);
                 break;
-                
+
               case "initial_data":
                 this.notifySubscribers("initial", data);
                 break;
             }
           }
 
-          // Broadcast ke semua subscriber
           this.notifySubscribers("broadcast", data);
         } catch (error) {
-          console.error(
-            "Failed to parse WebSocket message:",
-            error,
-            event.data?.substring?.(0, 100) || 'No data',
-          );
+          // Error handled silently
         }
       };
 
       this.socket.onerror = (event) => {
-        console.error("❌ Dashboard WebSocket error");
         this.isConnecting = false;
 
         this.notifySubscribers("connection", {
@@ -155,7 +127,6 @@ class WebSocketService {
       };
 
       this.socket.onclose = (event) => {
-        console.log(`🔌 Dashboard WebSocket disconnected. Code: ${event.code}`);
         this.isConnecting = false;
         this.stopHeartbeat();
 
@@ -167,38 +138,28 @@ class WebSocketService {
           timestamp: new Date().toISOString(),
         });
 
-        // ⚠️ Auto-reconnect dengan exponential backoff
         if (
           this.isServerAvailable &&
-          event.code !== 1000 && // Bukan normal closure
+          event.code !== 1000 &&
           this.reconnectAttempts < this.maxReconnectAttempts
         ) {
-          // Exponential backoff dengan minimum 10 detik
           const delay = Math.max(
             this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts),
-            10000, // Minimal 10 detik
-          );
-
-          console.log(
-            `⏱️ Will attempt reconnect in ${Math.round(delay / 1000)} seconds (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`,
+            10000,
           );
 
           setTimeout(() => {
             this.reconnectAttempts++;
             this.connect();
           }, delay);
-        } else {
-          console.log("⏹️ No more reconnect attempts or clean closure");
         }
       };
     } catch (error) {
-      console.error("❌ Failed to create WebSocket connection:", error);
       this.isConnecting = false;
       this.reconnectAttempts++;
     }
   }
 
-  // ⚠️ Rate limiting untuk messages
   shouldSkipMessage() {
     const now = Date.now();
     if (this.lastMessageTime === 0) {
@@ -207,14 +168,12 @@ class WebSocketService {
       return false;
     }
 
-    // Reset counter jika lebih dari 1 detik
     if (now - this.lastMessageTime > 1000) {
       this.lastMessageTime = now;
       this.messageCount = 1;
       return false;
     }
 
-    // Skip jika lebih dari 10 messages per detik
     this.messageCount++;
     if (this.messageCount > 10) {
       return true;
@@ -231,7 +190,6 @@ class WebSocketService {
     }
   }
 
-  // ============ SUBSCRIPTION METHODS ============
   subscribe(channel, callback) {
     if (!this.subscriptions.has(channel)) {
       this.subscriptions.set(channel, []);
@@ -242,19 +200,16 @@ class WebSocketService {
       callbacks.push(callback);
     }
 
-    // Auto connect jika belum connect dan server available
     if (
       this.isServerAvailable &&
       (!this.socket || this.socket.readyState !== WebSocket.OPEN) &&
       !this.isConnecting
     ) {
-      console.log(`🔄 Auto-connecting via subscribe to ${channel}`);
       this.connect().catch((err) => {
-        console.error("Failed to auto-connect:", err);
+        // Error handled silently
       });
     }
 
-    // Return unsubscribe function
     return () => this.unsubscribe(channel, callback);
   }
 
@@ -274,7 +229,7 @@ class WebSocketService {
       try {
         callback(data);
       } catch (error) {
-        console.error("Error in subscription callback:", error);
+        // Error handled silently
       }
     });
   }
@@ -286,11 +241,9 @@ class WebSocketService {
         this.socket.send(message);
         return true;
       } catch (error) {
-        console.error("Failed to send WebSocket message:", error);
         return false;
       }
     } else {
-      console.warn("⚠️ WebSocket not connected, cannot send message");
       return false;
     }
   }
@@ -305,7 +258,7 @@ class WebSocketService {
           timestamp: Date.now(),
         });
       }
-    }, 30000); // 30 detik sekali
+    }, 30000);
   }
 
   stopHeartbeat() {
@@ -337,7 +290,6 @@ class WebSocketService {
     }
   }
 
-  // ============ SPECIFIC SUBSCRIPTION METHODS ============
   subscribeToAgents = (callback) => {
     return this.subscribe("agents", callback);
   };
@@ -363,7 +315,6 @@ class WebSocketService {
   };
 }
 
-// Singleton instance
 const wsService = new WebSocketService();
 
 export default wsService;

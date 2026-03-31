@@ -10,30 +10,27 @@ export const useWebSocketStore = create((set, get) => ({
   error: null,
   lastConnectionTime: null,
   reconnectCount: 0,
-  lastUpdateTime: 0, 
-  messageCount: 0, 
+  lastUpdateTime: 0,
+  messageCount: 0,
 
   // Actions
   connect: () => {
     try {
       const now = Date.now();
       const state = get();
-      
+
       if (now - state.lastUpdateTime < 5000) {
-        console.log(" Skipping connect - too soon since last attempt");
-        return () => {}; 
+        return () => { };
       }
-      
-      console.log("🔌 Setting up WebSocket subscriptions...");
-      set({ 
-        connectionStatus: "connecting", 
+
+      set({
+        connectionStatus: "connecting",
         error: null,
-        lastUpdateTime: now 
+        lastUpdateTime: now
       });
 
       // Setup listeners
       const unsubscribeConnection = wsService.subscribeToConnection((data) => {
-        console.log("🔌 WebSocket connection event:", data.type);
 
         switch (data.type) {
           case "connected":
@@ -71,15 +68,14 @@ export const useWebSocketStore = create((set, get) => ({
       const handleMessage = (data, channel) => {
         const state = get();
         const now = Date.now();
-        
+
         if (now - state.lastUpdateTime < 2000) {
-          console.log(`Skipping ${channel} message - rate limited`);
           return;
         }
-        
+
         set((state) => ({
           lastMessage: { ...data, channel, receivedAt: new Date().toISOString() },
-          messageHistory: [...state.messageHistory.slice(-9), { 
+          messageHistory: [...state.messageHistory.slice(-9), {
             ...data,
             channel,
             receivedAt: new Date().toISOString(),
@@ -89,21 +85,20 @@ export const useWebSocketStore = create((set, get) => ({
         }));
       };
 
-      const unsubscribeAgents = wsService.subscribeToAgents((data) => 
+      const unsubscribeAgents = wsService.subscribeToAgents((data) =>
         handleMessage(data, "agents")
       );
 
-      const unsubscribePrinters = wsService.subscribeToPrinters((data) => 
+      const unsubscribePrinters = wsService.subscribeToPrinters((data) =>
         handleMessage(data, "printers")
       );
 
-      const unsubscribeBroadcast = wsService.subscribeToBroadcast((data) => 
+      const unsubscribeBroadcast = wsService.subscribeToBroadcast((data) =>
         handleMessage(data, "broadcast")
       );
 
       // Return cleanup function
       return () => {
-        console.log("🧹 Cleaning up WebSocket subscriptions");
         unsubscribeConnection?.();
         unsubscribeAgents?.();
         unsubscribePrinters?.();
@@ -116,8 +111,8 @@ export const useWebSocketStore = create((set, get) => ({
         error: error.message,
         lastUpdateTime: Date.now(),
       });
-      
-      return () => {}; 
+
+      return () => { };
     }
   },
 
@@ -133,15 +128,14 @@ export const useWebSocketStore = create((set, get) => ({
   reconnect: () => {
     const state = get();
     const now = Date.now();
-    
+
     // Debounce reconnect
     if (now - state.lastUpdateTime < 5000) {
-      console.log("⏸️ Skipping manual reconnect - too soon");
       return;
     }
-    
+
     get().disconnect();
-    
+
     // Delay sebelum reconnect
     setTimeout(() => {
       const cleanup = get().connect();
@@ -162,13 +156,12 @@ export const useWebSocketStore = create((set, get) => ({
   sendPrinterCommand: (command, printerName, data = {}) => {
     const state = get();
     const now = Date.now();
-    
+
     // Rate limiting untuk commands
     if (now - state.lastUpdateTime < 1000) {
-      console.log("⏸️ Skipping printer command - rate limited");
       return false;
     }
-    
+
     set({ lastUpdateTime: now });
     return wsService.send({
       type: "printer_command",
@@ -202,7 +195,7 @@ export const useWebSocketStore = create((set, get) => ({
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/health`,
-        { signal: AbortSignal.timeout(3000) } 
+        { signal: AbortSignal.timeout(3000) }
       );
       return response.ok;
     } catch {

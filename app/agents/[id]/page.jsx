@@ -56,17 +56,14 @@ export default function AgentDetailPage() {
     const [hostnameValue, setHostnameValue] = useState('');
     const [savingHostname, setSavingHostname] = useState(false);
 
-
     const loadAgentDetail = async () => {
         setLoading(true);
         setError(null);
         try {
             const data = await api.getAgent(agentId);
-            console.log('✅ Agent detail loaded:', data.agent?.name);
             setAgent(data.agent);
             setPrinters(data.printers || []);
         } catch (error) {
-            console.error('❌ Failed to load agent detail:', error);
             setError(error.message);
         } finally {
             setLoading(false);
@@ -89,7 +86,7 @@ export default function AgentDetailPage() {
             setAgent(prev => ({ ...prev, hostname: hostnameValue.trim() }));
             setEditingHostname(false);
         } catch (err) {
-            console.error('Failed to update hostname:', err);
+            // Error handled silently
         } finally {
             setSavingHostname(false);
         }
@@ -151,7 +148,7 @@ export default function AgentDetailPage() {
                 setApiKey(data.apiKey);
                 setVisible(true);
             } catch (err) {
-                console.error('Failed to fetch API key:', err);
+                // Error handled silently
             } finally {
                 setLoading(false);
             }
@@ -198,13 +195,11 @@ export default function AgentDetailPage() {
         );
     };
 
-    // ─── Printer Card ─────────────────────────────────────────────────────────
     const PrinterCard = ({ printer }) => {
         const hasInkData = printer.inkLevels && Object.keys(printer.inkLevels).length > 0;
         const isOnline = printer.status === 'ready' || printer.status === 'online';
         const detail = printer.printerStatusDetail || printer.printer_status_detail;
 
-        // Normalize field names (camelCase from new API, snake_case fallback)
         const pagesToday = printer.pagesToday ?? printer.pages_today ?? 0;
         const totalPages = printer.totalPages ?? printer.total_pages ?? 0;
         const colorPagesToday = printer.colorPagesToday ?? printer.color_pages_today ?? 0;
@@ -212,7 +207,6 @@ export default function AgentDetailPage() {
         const colorPagesTotal = printer.colorPagesTotal ?? printer.color_pages_total ?? 0;
         const bwPagesTotal = printer.bwPagesTotal ?? printer.bw_pages_total ?? 0;
 
-        // Ratios
         const colorRatioToday = pagesToday > 0 ? Math.round((colorPagesToday / pagesToday) * 100) : 0;
         const bwRatioToday = pagesToday > 0 ? 100 - colorRatioToday : 0;
         const colorRatioTotal = totalPages > 0 ? Math.round((colorPagesTotal / totalPages) * 100) : 0;
@@ -224,7 +218,6 @@ export default function AgentDetailPage() {
             <Card className="border border-gray-200 hover:border-gray-300 transition-colors">
                 <CardContent className="p-4">
 
-                    {/* ── Header ── */}
                     <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-3">
                             <div className={`h-8 w-8 rounded-full ${isOnline ? 'bg-gray-100' : 'bg-gray-50'} flex items-center justify-center`}>
@@ -266,7 +259,6 @@ export default function AgentDetailPage() {
                         )}
                     </div>
 
-                    {/* ── Stats Row ── */}
                     <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
                         <div className="bg-gray-50 rounded p-2 text-center">
                             <FileText className="h-3.5 w-3.5 text-gray-400 mx-auto mb-1" />
@@ -288,7 +280,6 @@ export default function AgentDetailPage() {
                         </div>
                     </div>
 
-                    {/* ── IP Address ── */}
                     {printer.ipAddress && (
                         <div className="flex items-center gap-1.5 mb-3 text-xs">
                             <Network className="h-3 w-3 text-gray-400" />
@@ -296,7 +287,6 @@ export default function AgentDetailPage() {
                         </div>
                     )}
 
-                    {/* ── Color vs B&W Breakdown ── */}
                     {hasColorData && (
                         <div className="border-t border-gray-100 mt-2 pt-3 space-y-3">
                             <div className="flex items-center gap-1.5">
@@ -304,7 +294,6 @@ export default function AgentDetailPage() {
                                 <span className="text-xs font-medium text-gray-700">Color vs B&W</span>
                             </div>
 
-                            {/* Today breakdown */}
                             {pagesToday > 0 && (
                                 <div className="space-y-1.5">
                                     <div className="flex items-center justify-between text-[10px] text-gray-500">
@@ -327,7 +316,6 @@ export default function AgentDetailPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Ratio bar */}
                                     <div className="h-1.5 w-full rounded-full overflow-hidden bg-gray-100 flex">
                                         <div style={{ width: `${colorRatioToday}%`, backgroundColor: "#6366f1", transition: "width 0.4s ease" }} className="h-full" />
                                         <div style={{ width: `${bwRatioToday}%`, backgroundColor: "#9ca3af", transition: "width 0.4s ease" }} className="h-full" />
@@ -335,7 +323,6 @@ export default function AgentDetailPage() {
                                 </div>
                             )}
 
-                            {/* Lifetime breakdown */}
                             {totalPages > 0 && (
                                 <div className="space-y-1.5">
                                     <div className="flex items-center justify-between text-[10px] text-gray-500">
@@ -358,7 +345,6 @@ export default function AgentDetailPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Ratio bar */}
                                     <div className="h-1.5 w-full rounded-full overflow-hidden bg-gray-100 flex">
                                         <div style={{ width: `${colorRatioTotal}%`, backgroundColor: "#6366f1", transition: "width 0.4s ease" }} className="h-full" />
                                         <div style={{ width: `${bwRatioTotal}%`, backgroundColor: "#9ca3af", transition: "width 0.4s ease" }} className="h-full" />
@@ -368,7 +354,6 @@ export default function AgentDetailPage() {
                         </div>
                     )}
 
-                    {/* ── Ink Levels ── */}
                     {hasInkData && (
                         <div className="space-y-2 pt-2 border-t border-gray-100 mt-3">
                             <div className="flex items-center gap-1.5 mb-2">
@@ -420,7 +405,6 @@ export default function AgentDetailPage() {
         );
     };
 
-    // ─── Loading State ────────────────────────────────────────────────────────
     if (loading) {
         return (
             <div className="p-6 max-w-7xl mx-auto">
@@ -443,7 +427,6 @@ export default function AgentDetailPage() {
         );
     }
 
-    // ─── Error State ──────────────────────────────────────────────────────────
     if (error || !agent) {
         return (
             <div className="p-6 max-w-7xl mx-auto">
@@ -463,10 +446,8 @@ export default function AgentDetailPage() {
         );
     }
 
-    // ─── Main Render ──────────────────────────────────────────────────────────
     return (
         <div className="p-6 max-w-7xl mx-auto">
-            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="sm" onClick={() => router.back()}>
@@ -529,9 +510,7 @@ export default function AgentDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* ── Left Column ── */}
                 <div className="lg:col-span-1 space-y-6">
-                    {/* Status Card */}
                     <Card className="border border-gray-200">
                         <CardHeader className="border-b border-gray-100 pb-3">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -560,7 +539,6 @@ export default function AgentDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Company Info */}
                     <Card className="border border-gray-200">
                         <CardHeader className="border-b border-gray-100 pb-3">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -585,7 +563,6 @@ export default function AgentDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* System Info */}
                     <Card className="border border-gray-200">
                         <CardHeader className="border-b border-gray-100 pb-3">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -610,7 +587,6 @@ export default function AgentDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Agent ID & API Key */}
                     <Card className="border border-gray-200 bg-gray-50">
                         <CardContent className="p-4 space-y-3">
                             <div>
@@ -626,7 +602,6 @@ export default function AgentDetailPage() {
                     </Card>
                 </div>
 
-                {/* ── Right Column — Printers ── */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card className="border border-gray-200">
                         <CardHeader className="border-b border-gray-100 pb-3">

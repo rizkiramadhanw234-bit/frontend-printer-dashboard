@@ -3,7 +3,6 @@ import { api } from "../services/api";
 import { useAppStore } from "./app.store";
 
 export const usePrinterStore = create((set, get) => ({
-    // ========== STATE ==========
     allPrinters: [],
     agentPrinters: {},
     selectedPrinter: null,
@@ -13,24 +12,20 @@ export const usePrinterStore = create((set, get) => ({
     isLoading: false,
     error: null,
 
-    // ========== ALL PRINTERS ==========
-
     fetchAllPrinters: async () => {
         try {
             set({ isLoading: true, error: null });
 
-            const response = await api.getAllPrinters(); // ← GET /api/printers
+            const response = await api.getAllPrinters();
 
             set({
                 allPrinters: response.printers || [],
                 isLoading: false
             });
 
-            console.log(`✅ Loaded ${response.printers?.length || 0} printers from all agents`);
             return response;
 
         } catch (error) {
-            console.error("Failed to fetch all printers:", error);
             set({
                 error: error.message,
                 isLoading: false,
@@ -40,23 +35,17 @@ export const usePrinterStore = create((set, get) => ({
         }
     },
 
-    // ========== AGENT PRINTERS (PAKAI API KEY) ==========
-
     fetchAgentPrinters: async (agentId) => {
         try {
             set({ isLoading: true, error: null });
 
-            // 🔥 Ambil API key dari app store
             const appState = useAppStore.getState();
             let apiKey = appState.agentsWithKeys?.[agentId];
 
-            // Kalau belum ada, ambil dulu dari API
             if (!apiKey) {
-                console.log(`🔑 Fetching API key for agent ${agentId}...`);
                 const keyRes = await api.getAgentApiKey(agentId);
                 apiKey = keyRes.apiKey;
 
-                // Simpan di store
                 useAppStore.setState(state => ({
                     agentsWithKeys: {
                         ...(state.agentsWithKeys || {}),
@@ -65,7 +54,6 @@ export const usePrinterStore = create((set, get) => ({
                 }));
             }
 
-            // Panggil printer dengan API key
             const response = await api.getAgentPrinters(agentId, apiKey);
 
             set(state => ({
@@ -76,11 +64,9 @@ export const usePrinterStore = create((set, get) => ({
                 isLoading: false
             }));
 
-            console.log(`✅ Loaded ${response.printers?.length || 0} printers for agent ${agentId}`);
             return response;
 
         } catch (error) {
-            console.error(`Failed to fetch printers for agent ${agentId}:`, error);
             set({
                 error: error.message,
                 isLoading: false
@@ -89,13 +75,10 @@ export const usePrinterStore = create((set, get) => ({
         }
     },
 
-    // ========== SINGLE PRINTER (PAKAI API KEY) ==========
-
     fetchAgentPrinter: async (agentId, printerName) => {
         try {
             set({ isLoading: true, error: null });
 
-            // 🔥 Ambil API key
             const appState = useAppStore.getState();
             let apiKey = appState.agentsWithKeys?.[agentId];
 
@@ -118,11 +101,9 @@ export const usePrinterStore = create((set, get) => ({
                 isLoading: false
             });
 
-            console.log(`✅ Loaded printer ${printerName} from agent ${agentId}`);
             return response;
 
         } catch (error) {
-            console.error(`Failed to fetch printer ${printerName}:`, error);
             set({
                 error: error.message,
                 isLoading: false,
@@ -131,8 +112,6 @@ export const usePrinterStore = create((set, get) => ({
             throw error;
         }
     },
-
-    // ========== PRINTER LIFETIME REPORT ==========
 
     fetchPrinterLifetimeReport: async (printerName) => {
         try {
@@ -148,11 +127,9 @@ export const usePrinterStore = create((set, get) => ({
                 isLoading: false
             }));
 
-            console.log(`✅ Loaded lifetime report for ${printerName}`);
             return response;
 
         } catch (error) {
-            console.error(`Failed to fetch lifetime report for ${printerName}:`, error);
             set({
                 error: error.message,
                 isLoading: false
@@ -161,13 +138,10 @@ export const usePrinterStore = create((set, get) => ({
         }
     },
 
-    // ========== PRINTER CONTROL ==========
-
     pausePrinter: async (agentId, printerName) => {
         const appState = useAppStore.getState();
         let apiKey = appState.agentsWithKeys?.[agentId];
 
-        // Auto-fetch API key
         if (!apiKey) {
             const keyRes = await api.getAgentApiKey(agentId);
             apiKey = keyRes.apiKey;
@@ -193,19 +167,14 @@ export const usePrinterStore = create((set, get) => ({
 
             const response = await api.resumePrinter(agentId, printerName, apiKey);
 
-            // Refresh printer data after resume
             await get().fetchAgentPrinter(agentId, printerName);
 
-            console.log(`✅ Resumed printer ${printerName}`);
             return response;
 
         } catch (error) {
-            console.error(`Failed to resume printer ${printerName}:`, error);
             throw error;
         }
     },
-
-    // ========== GETTERS ==========
 
     getPrintersWithLowInk: () => {
         return get().allPrinters.filter(p => {
@@ -241,7 +210,6 @@ export const usePrinterStore = create((set, get) => ({
         });
     },
 
-    // ========== STATISTICS ==========
     getAllPrintersStatistics: () => {
         const printers = get().allPrinters;
 
@@ -265,7 +233,6 @@ export const usePrinterStore = create((set, get) => ({
         const lowInk = printers.filter(p => {
             if (p.printer_status_detail === 'low_ink') return true;
             if (p.lowInkColors && p.lowInkColors.length > 0) {
-                // Parse ink_levels dulu
                 const inkLevels = typeof p.ink_levels === 'string'
                     ? JSON.parse(p.ink_levels)
                     : p.ink_levels || {};
@@ -292,24 +259,20 @@ export const usePrinterStore = create((set, get) => ({
             return false;
         }).length;
 
-        // Detail status counts
         const paperJam = printers.filter(p => p.printerStatusDetail === 'paper_jam').length;
         const outOfPaper = printers.filter(p => p.printerStatusDetail === 'out_of_paper').length;
         const doorOpen = printers.filter(p => p.printerStatusDetail === 'door_open').length;
 
-        // Group by vendor
         const byVendor = printers.reduce((acc, p) => {
             const vendor = p.vendor || "Unknown";
             acc[vendor] = (acc[vendor] || 0) + 1;
             return acc;
         }, {});
 
-        // Total pages today
         const totalPagesToday = printers.reduce((sum, p) =>
             sum + (p.pages_today || 0), 0
         );
 
-        // Color/BW breakdown
         const colorPagesToday = printers.reduce((sum, p) =>
             sum + (p.color_pages_today || 0), 0
         );
@@ -339,34 +302,27 @@ export const usePrinterStore = create((set, get) => ({
     setupWebSocketSync: () => {
         const wsService = require('../services/ws').default;
 
-        // Subscribe ke printer update dari WebSocket
         const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
             if (data.type === 'printer_update') {
                 await get().fetchAllPrinters();
             }
         });
 
-        // Subscribe ke agent disconnect
         const unsubAgents = wsService.subscribeToAgents(async (data) => {
             if (data.type === 'agent_disconnected') {
-                console.log('🔌 WS agent_disconnected, refreshing printers...');
                 await get().fetchAllPrinters();
             }
         });
 
-        // Return cleanup
         return () => {
             unsubPrinters?.();
             unsubAgents?.();
         };
     },
 
-    // ========== UTILS ==========
-
     refresh: async () => {
         await get().fetchAllPrinters();
 
-        // Refresh juga agent printers untuk agent yang sedang dipilih
         const { selectedAgentId } = useAppStore.getState();
         if (selectedAgentId) {
             await get().fetchAgentPrinters(selectedAgentId);
@@ -384,4 +340,3 @@ export const usePrinterStore = create((set, get) => ({
         });
     }
 }));
-

@@ -5,7 +5,6 @@ import { persist } from "zustand/middleware";
 export const useAppStore = create(
   persist(
     (set, get) => ({
-      // ========== STATE ==========
       agents: [],
       selectedAgentId: null,
       health: null,
@@ -18,8 +17,6 @@ export const useAppStore = create(
       isLoading: false,
       error: null,
 
-      // ========== AGENT ACTIONS ==========
-      
       loadAgents: async () => {
         try {
           set({ isLoading: true, error: null });
@@ -32,11 +29,9 @@ export const useAppStore = create(
             isLoading: false
           });
 
-          console.log(`✅ Loaded ${agents.length} agents`);
           return agents;
 
         } catch (error) {
-          console.error("Failed to load agents:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
@@ -48,18 +43,14 @@ export const useAppStore = create(
         try {
           set({ selectedAgentId: agentId, isLoading: true });
 
-          console.log(`🔄 Selecting agent ${agentId}`);
-          
           const data = await api.getAgent(agentId);
 
           if (data.success) {
             set({ isLoading: false });
-            console.log(`✅ Selected agent ${agentId}`);
             return data;
           }
 
         } catch (error) {
-          console.error(`❌ Failed to select agent ${agentId}:`, error);
           set({
             error: error.message,
             isLoading: false
@@ -68,15 +59,12 @@ export const useAppStore = create(
         }
       },
 
-      // ========== SYSTEM ACTIONS ==========
-
       loadHealth: async () => {
         try {
           const res = await api.getHealth();
           set({ health: res });
           return res;
         } catch (error) {
-          console.error("Failed to load health:", error);
           throw error;
         }
       },
@@ -87,7 +75,6 @@ export const useAppStore = create(
           set({ systemInfo: res });
           return res;
         } catch (error) {
-          console.error("Failed to load system info:", error);
           throw error;
         }
       },
@@ -102,20 +89,17 @@ export const useAppStore = create(
             get().loadSystemInfo()
           ]);
 
-          // Auto-select first agent if none selected
           const { agents, selectedAgentId } = get();
           if (agents.length > 0 && !selectedAgentId) {
             await get().selectAgent(agents[0].id);
           }
 
         } catch (error) {
-          console.error("Failed to load dashboard:", error);
+          // Error handled silently
         } finally {
           set({ isLoading: false });
         }
       },
-
-      // ========== COMPANY ACTIONS ==========
 
       loadCompanies: async () => {
         try {
@@ -127,7 +111,6 @@ export const useAppStore = create(
           });
           return res.data;
         } catch (error) {
-          console.error("Failed to load companies:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
@@ -141,7 +124,6 @@ export const useAppStore = create(
           set({ isLoading: false });
           return res;
         } catch (error) {
-          console.error("Failed to create company:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
@@ -155,7 +137,6 @@ export const useAppStore = create(
           set({ isLoading: false });
           return res;
         } catch (error) {
-          console.error("Failed to delete company:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
@@ -168,13 +149,10 @@ export const useAppStore = create(
           set({ isLoading: false });
           return res;
         } catch (error) {
-          console.error("Failed to verify license:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
       },
-
-      // ========== DEPARTMENT ACTIONS ==========
 
       loadDepartments: async (companyId) => {
         try {
@@ -185,7 +163,6 @@ export const useAppStore = create(
           });
           return res.data;
         } catch (error) {
-          console.error("Failed to load departments:", error);
           set({ departments: [] });
           throw error;
         }
@@ -199,13 +176,10 @@ export const useAppStore = create(
           set({ isLoading: false });
           return res;
         } catch (error) {
-          console.error("Failed to create department:", error);
           set({ error: error.message, isLoading: false });
           throw error;
         }
       },
-
-      // ========== GETTERS ==========
 
       selectedAgent: () => {
         const { agents, selectedAgentId } = get();
@@ -223,8 +197,6 @@ export const useAppStore = create(
       getDepartmentById: (departmentId) => {
         return get().departments.find(d => d.id === departmentId);
       },
-
-      // ========== UTILS ==========
 
       refresh: async () => {
         await get().loadDashboard();

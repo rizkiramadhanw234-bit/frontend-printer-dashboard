@@ -5,8 +5,6 @@ import { persist } from "zustand/middleware";
 export const useSystemStore = create(
   persist(
     (set, get) => ({
-      // ========== STATE ==========
-      
       health: {
         status: "unknown",
         server: "Printer Dashboard Backend",
@@ -54,14 +52,12 @@ export const useSystemStore = create(
       error: null,
       lastUpdated: null,
 
-      // ========== HEALTH ==========
-
       fetchHealth: async () => {
         try {
           set({ isLoading: true, error: null });
-          
+
           const data = await api.getHealth();
-          
+
           set({
             health: {
               status: data.status || "unknown",
@@ -77,11 +73,9 @@ export const useSystemStore = create(
             isLoading: false
           });
 
-          console.log('✅ Health check:', data.status);
           return data;
-          
+
         } catch (error) {
-          console.error("Failed to fetch health:", error);
           set({
             health: {
               status: "error",
@@ -101,14 +95,12 @@ export const useSystemStore = create(
         }
       },
 
-      // ========== SYSTEM INFO ==========
-
       fetchSystemInfo: async () => {
         try {
           set({ isLoading: true, error: null });
-          
+
           const data = await api.getSystemInfo();
-          
+
           set({
             systemInfo: {
               nodeVersion: data.system?.nodeVersion || null,
@@ -123,11 +115,9 @@ export const useSystemStore = create(
             isLoading: false
           });
 
-          console.log('✅ System info loaded');
           return data;
-          
+
         } catch (error) {
-          console.error("Failed to fetch system info:", error);
           set({
             error: error.message,
             isLoading: false
@@ -136,12 +126,10 @@ export const useSystemStore = create(
         }
       },
 
-      // ========== WEBSOCKET STATUS ==========
-
       fetchWebsocketStatus: async () => {
         try {
           const data = await api.getWebsocketStatus();
-          
+
           set({
             websocketStatus: {
               agentConnections: data.agentConnections || { count: 0, connections: [] },
@@ -150,36 +138,29 @@ export const useSystemStore = create(
             lastUpdated: new Date().toISOString()
           });
 
-          console.log('✅ WebSocket status loaded');
           return data;
-          
+
         } catch (error) {
-          console.error("Failed to fetch websocket status:", error);
           throw error;
         }
       },
 
-      // ========== LOAD ALL SYSTEM DATA ==========
-
       fetchAllSystemData: async () => {
         try {
           set({ isLoading: true });
-          
+
           await Promise.all([
             get().fetchHealth(),
             get().fetchSystemInfo(),
             get().fetchWebsocketStatus()
           ]);
-          
+
           set({ isLoading: false });
-          
+
         } catch (error) {
-          console.error("Failed to fetch all system data:", error);
           set({ isLoading: false });
         }
       },
-
-      // ========== SETTINGS ==========
 
       updateSettings: (newSettings) => {
         const settings = get().settings;
@@ -189,14 +170,11 @@ export const useSystemStore = create(
             ...newSettings
           }
         });
-        
-        // Save to localStorage
+
         localStorage.setItem(
           "printerDashboardSettings",
           JSON.stringify(get().settings)
         );
-        
-        console.log('✅ Settings updated:', newSettings);
       },
 
       loadSettings: () => {
@@ -205,32 +183,23 @@ export const useSystemStore = create(
           try {
             const parsedSettings = JSON.parse(savedSettings);
             set({ settings: parsedSettings });
-            console.log('✅ Settings loaded from localStorage');
           } catch (error) {
-            console.error("Failed to parse saved settings:", error);
+            // Error handled silently
           }
         }
       },
 
-      // ========== HEALTH MONITORING ==========
-
       startHealthMonitoring: () => {
         const interval = setInterval(() => {
           get().fetchHealth();
-        }, 30000); // Check every 30 seconds
-        
-        // Initial fetch
+        }, 30000);
+
         get().fetchHealth();
-        
-        console.log('✅ Health monitoring started');
-        
+
         return () => {
           clearInterval(interval);
-          console.log('🛑 Health monitoring stopped');
         };
       },
-
-      // ========== GETTERS ==========
 
       isHealthy: () => {
         const health = get().health;
@@ -252,7 +221,7 @@ export const useSystemStore = create(
       getMemoryUsage: () => {
         const memory = get().systemInfo.memoryUsage;
         if (!memory.rss) return null;
-        
+
         return {
           rss: (memory.rss / 1024 / 1024).toFixed(2) + ' MB',
           heapTotal: (memory.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
@@ -264,7 +233,7 @@ export const useSystemStore = create(
       getConnectionsSummary: () => {
         const health = get().health;
         const ws = get().websocketStatus;
-        
+
         return {
           agents: health.connections?.agents || 0,
           dashboards: health.connections?.dashboards || 0,
@@ -272,8 +241,6 @@ export const useSystemStore = create(
           wsDashboards: ws.dashboardConnections?.count || 0
         };
       },
-
-      // ========== UTILS ==========
 
       refresh: async () => {
         await get().fetchAllSystemData();
