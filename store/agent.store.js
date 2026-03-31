@@ -17,19 +17,16 @@ export const useAppStore = create(
       isLoading: false,
       error: null,
 
-      // ========== AGENTS ==========
+      // AGENTS
       loadAgents: async () => {
         try {
           set({ isLoading: true, error: null });
 
           const res = await api.getAllAgents();
           const agents = res.agents || [];
-
-          // Simpan API key per agent
           const agentsWithKeys = {};
+
           agents.forEach(agent => {
-            // API Key ada di endpoint detail, belum di list
-            // Nanti akan diisi pas load agent detail
             agentsWithKeys[agent.id] = null;
           });
 
@@ -74,7 +71,7 @@ export const useAppStore = create(
         }
       },
 
-      // ========== COMPANY & DEPARTEMENT ==========
+      //  COMPANY & DEPARTEMENT 
       loadCompanies: async () => {
         try {
           const res = await api.getCompanies();
@@ -130,7 +127,7 @@ export const useAppStore = create(
         }
       },
 
-      // ========== REPORTS ==========
+      // REPORTS 
       loadMonthlyReport: async (year, month) => {
         try {
           const res = await api.getMonthlyReport(year, month);
@@ -152,7 +149,7 @@ export const useAppStore = create(
         }
       },
 
-      // ========== SYSTEM ==========
+      // SYSTEM 
       loadHealth: async () => {
         try {
           const res = await api.getHealth();
@@ -164,7 +161,7 @@ export const useAppStore = create(
         }
       },
 
-      // ========== DASHBOARD ==========
+      // DASHBOARD 
       loadDashboard: async () => {
         await Promise.all([
           get().loadAgents(),
@@ -172,7 +169,7 @@ export const useAppStore = create(
         ]);
       },
 
-      // ========== GETTERS ==========
+      // GETTERS 
       selectedAgent: () => {
         const { agents, selectedAgentId } = get();
         return agents.find(a => a.id === selectedAgentId) || null;
