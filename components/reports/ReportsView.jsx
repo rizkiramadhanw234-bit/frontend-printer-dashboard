@@ -588,7 +588,6 @@ function MonthlyReportView({ agents }) {
     const byAgent = monthlyReport?.byAgent || [];
 
     const totalPages = Number(summary.totalPages) || 0;
-    // ✅ FIX: backend returns totalColorPages/totalBwPages in summary
     const colorPagesM = Number(summary.totalColorPages || summary.colorPages) || 0;
     const bwPagesM = Number(summary.totalBwPages || summary.bwPages) || 0;
 

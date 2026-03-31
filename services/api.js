@@ -106,6 +106,12 @@ export const api = {
   getAgentApiKey: (agentId) =>
     fetchAPI(`/api/agents/${agentId}/api-key`),
 
+  updateAgent: (id, data) =>
+    fetchAPI(`/api/agents/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
   // ========== PRINTERS ==========
   getAllPrinters: () => fetchAPI('/api/printers'),
 

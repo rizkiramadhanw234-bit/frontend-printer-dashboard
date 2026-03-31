@@ -35,6 +35,8 @@ import {
     Activity,
     Palette,
     ScanLine,
+    Pencil,
+    Eye, EyeOff, Copy, Check
 } from "lucide-react";
 import { api } from "@/services/api";
 
@@ -49,6 +51,11 @@ export default function AgentDetailPage() {
     const [printers, setPrinters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    const [editingHostname, setEditingHostname] = useState(false);
+    const [hostnameValue, setHostnameValue] = useState('');
+    const [savingHostname, setSavingHostname] = useState(false);
+
 
     const loadAgentDetail = async () => {
         setLoading(true);
@@ -69,6 +76,24 @@ export default function AgentDetailPage() {
     useEffect(() => {
         if (agentId) loadAgentDetail();
     }, [agentId]);
+
+    useEffect(() => {
+        if (agent) setHostnameValue(agent.hostname);
+    }, [agent]);
+
+    const handleSaveHostname = async () => {
+        if (!hostnameValue.trim()) return;
+        setSavingHostname(true);
+        try {
+            await api.updateAgent(agentId, { hostname: hostnameValue.trim() });
+            setAgent(prev => ({ ...prev, hostname: hostnameValue.trim() }));
+            setEditingHostname(false);
+        } catch (err) {
+            console.error('Failed to update hostname:', err);
+        } finally {
+            setSavingHostname(false);
+        }
+    };
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -110,6 +135,67 @@ export default function AgentDetailPage() {
         if (s === 'error') return 'bg-red-500';
         if (s === 'paused') return 'bg-gray-500';
         return 'bg-gray-300';
+    };
+
+    const ApiKeyField = ({ agentId }) => {
+        const [apiKey, setApiKey] = useState(null);
+        const [visible, setVisible] = useState(false);
+        const [loading, setLoading] = useState(false);
+        const [copied, setCopied] = useState(false);
+
+        const fetchApiKey = async () => {
+            if (apiKey) { setVisible(v => !v); return; }
+            setLoading(true);
+            try {
+                const data = await api.getAgentApiKey(agentId);
+                setApiKey(data.apiKey);
+                setVisible(true);
+            } catch (err) {
+                console.error('Failed to fetch API key:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const handleCopy = () => {
+            if (!apiKey) return;
+            navigator.clipboard.writeText(apiKey);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        };
+
+        return (
+            <div className="flex items-center gap-2">
+                <p className="text-xs font-mono text-gray-900 break-all flex-1">
+                    {visible && apiKey ? apiKey : '•'.repeat(32)}
+                </p>
+                <button
+                    onClick={fetchApiKey}
+                    disabled={loading}
+                    className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                    title={visible ? 'Hide' : 'Show'}
+                >
+                    {loading ? (
+                        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                    ) : visible ? (
+                        <EyeOff className="h-3.5 w-3.5" />
+                    ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                    )}
+                </button>
+                {apiKey && (
+                    <button
+                        onClick={handleCopy}
+                        className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                        title="Copy"
+                    >
+                        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                )}
+            </div>
+        );
     };
 
     // ─── Printer Card ─────────────────────────────────────────────────────────
@@ -388,7 +474,53 @@ export default function AgentDetailPage() {
                     </Button>
                     <div>
                         <h1 className="text-2xl font-semibold text-gray-900">{agent.name}</h1>
-                        <p className="text-sm text-gray-500 mt-1">{agent.hostname}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                            {editingHostname ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={hostnameValue}
+                                        onChange={e => setHostnameValue(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') handleSaveHostname();
+                                            if (e.key === 'Escape') setEditingHostname(false);
+                                        }}
+                                        className="text-sm border border-gray-300 rounded px-2 py-0.5 text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-400 w-52"
+                                        autoFocus
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 text-xs px-2"
+                                        onClick={handleSaveHostname}
+                                        disabled={savingHostname}
+                                    >
+                                        {savingHostname ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-xs px-2"
+                                        onClick={() => {
+                                            setHostnameValue(agent.hostname);
+                                            setEditingHostname(false);
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm text-gray-500">{agent.hostname}</p>
+                                    <button
+                                        onClick={() => setEditingHostname(true)}
+                                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={loadAgentDetail} disabled={loading}>
@@ -478,11 +610,18 @@ export default function AgentDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Agent ID */}
+                    {/* Agent ID & API Key */}
                     <Card className="border border-gray-200 bg-gray-50">
-                        <CardContent className="p-4">
-                            <p className="text-xs text-gray-500 mb-1">Agent ID</p>
-                            <p className="text-xs font-mono text-gray-900 break-all">{agent.id}</p>
+                        <CardContent className="p-4 space-y-3">
+                            <div>
+                                <p className="text-xs text-gray-500 mb-1">Agent ID</p>
+                                <p className="text-xs font-mono text-gray-900 break-all">{agent.id}</p>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-xs text-gray-500 mb-1">Token</p>
+                                <ApiKeyField agentId={agent.id} />
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

@@ -44,7 +44,6 @@ export const useReportStore = create((set, get) => ({
         isLoading: false
       });
 
-      console.log(`✅ Loaded daily report for ${response.date}`);
       return response;
 
     } catch (error) {

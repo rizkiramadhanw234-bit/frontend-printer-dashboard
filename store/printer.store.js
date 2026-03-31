@@ -342,7 +342,6 @@ export const usePrinterStore = create((set, get) => ({
         // Subscribe ke printer update dari WebSocket
         const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
             if (data.type === 'printer_update') {
-                console.log('🔄 WS printer_update received, refreshing...');
                 await get().fetchAllPrinters();
             }
         });
