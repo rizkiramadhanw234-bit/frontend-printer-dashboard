@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend
@@ -14,33 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useReportStore } from "@/store/report.store";
 import { useAppStore } from "@/store/app.store";
-
-// ─── PDF Export ───────────────────────────────────────────────────────────────
-async function exportToPDF(elementRef, filename) {
-    const { default: jsPDF } = await import("jspdf");
-    const { default: html2canvas } = await import("html2canvas");
-    const element = elementRef.current;
-    if (!element) return;
-    const originalBg = element.style.background;
-    element.style.background = "#ffffff";
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
-    element.style.background = originalBg;
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const imgH = (canvas.height * pageW) / canvas.width;
-    let heightLeft = imgH, position = 0;
-    pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
-    heightLeft -= pageH;
-    while (heightLeft > 0) {
-        position = heightLeft - imgH;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pageW, imgH);
-        heightLeft -= pageH;
-    }
-    pdf.save(filename);
-}
+import { downloadDailyPDF, downloadMonthlyPDF } from "@/components/ReportPDF";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, color = "gray" }) {
@@ -139,7 +113,6 @@ function getDatesBetween(start, end) {
 // ─── DAILY REPORT ─────────────────────────────────────────────────────────────
 function DailyReportView({ agents }) {
     const { fetchDailyReport, dailyReport, isLoading, error } = useReportStore();
-    const printRef = useRef(null);
 
     const today = new Date().toISOString().split("T")[0];
     const defaultStart = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split("T")[0]; })();
@@ -155,6 +128,7 @@ function DailyReportView({ agents }) {
     const [rangeReports, setRangeReports] = useState([]);
     const [rangeLoading, setRangeLoading] = useState(false);
     const [rangeSummary, setRangeSummary] = useState(null);
+    const [exportScope, setExportScope] = useState("global"); // "global" | "per-agent"
 
     useEffect(() => {
         if (mode === "single") fetchDailyReport({ date: selectedDate, agentId: selectedAgentId || undefined });
@@ -177,7 +151,6 @@ function DailyReportView({ agents }) {
             return {
                 date,
                 totalPages: parseInt(v.totalPages || 0),
-                // ✅ FIX: backend returns totalColorPages/totalBwPages
                 colorPages: parseInt(v.totalColorPages || v.colorPages || 0),
                 bwPages: parseInt(v.totalBwPages || v.bwPages || 0),
                 agentCount: v.agentCount || 0,
@@ -206,21 +179,43 @@ function DailyReportView({ agents }) {
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            const filename = mode === "single"
-                ? `daily-report-${selectedDate}.pdf`
-                : `daily-report-${appliedStart}-to-${appliedEnd}.pdf`;
-            await exportToPDF(printRef, filename);
-        } finally { setIsExporting(false); }
+            const shouldUseAgent = exportScope === "per-agent" && selectedAgentId;
+            const targetAgent = shouldUseAgent
+                ? agents.find((a) => String(a.id) === String(selectedAgentId))
+                : null;
+            const agentName = targetAgent?.name;
+            const agentHostname = targetAgent?.hostname;
+
+            if (mode === "range") {
+                await downloadDailyPDF({
+                    mode: "range",
+                    report: rangeReports,
+                    summary: rangeSummary,
+                    startDate: appliedStart,
+                    endDate: appliedEnd,
+                    agentName,
+                    agentHostname,
+                });
+            } else {
+                await downloadDailyPDF({
+                    mode: "single",
+                    report: dailyReport,
+                    date: selectedDate,
+                    agentName,
+                    agentHostname,
+                });
+            }
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const byPrinter = dailyReport?.byPrinter || [];
     const byAgent = dailyReport?.byAgent || [];
     const totalPagesSingle = Number(dailyReport?.totalPages) || 0;
-    // ✅ FIX: backend returns totalColorPages/totalBwPages for daily
     const colorPagesSingle = Number(dailyReport?.totalColorPages || dailyReport?.colorPages) || 0;
     const bwPagesSingle = Number(dailyReport?.totalBwPages || dailyReport?.bwPages) || 0;
 
-    // Chart data for range
     const chartData = rangeReports.map((r) => ({
         date: new Date(r.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
         color: r.colorPages,
@@ -277,12 +272,39 @@ function DailyReportView({ agents }) {
                     {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
 
-                <Button onClick={handleExport}
-                    disabled={isExporting || showLoading || (mode === "single" ? !dailyReport : !rangeSummary)}
-                    className="ml-auto gap-2 bg-gray-900 hover:bg-gray-700 text-white" size="sm">
-                    <FileDown className="h-4 w-4" />
-                    {isExporting ? "Exporting..." : "Export PDF"}
-                </Button>
+                {/* Export Scope + Button */}
+                <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                        <button
+                            onClick={() => setExportScope("global")}
+                            className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "global"
+                                    ? "bg-white text-gray-900 shadow-sm font-medium"
+                                    : "text-gray-500"
+                                }`}
+                        >
+                            Global
+                        </button>
+                        <button
+                            onClick={() => setExportScope("per-agent")}
+                            disabled={!selectedAgentId}
+                            className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "per-agent" && selectedAgentId
+                                    ? "bg-white text-gray-900 shadow-sm font-medium"
+                                    : "text-gray-500 disabled:opacity-40"
+                                }`}
+                        >
+                            Per Agent
+                        </button>
+                    </div>
+                    <Button
+                        onClick={handleExport}
+                        disabled={isExporting || showLoading || (mode === "single" ? !dailyReport : !rangeSummary)}
+                        className="gap-2 bg-gray-900 hover:bg-gray-700 text-white"
+                        size="sm"
+                    >
+                        <FileDown className="h-4 w-4" />
+                        {isExporting ? "Exporting..." : "Export PDF"}
+                    </Button>
+                </div>
             </div>
 
             {/* Loading */}
@@ -301,7 +323,7 @@ function DailyReportView({ agents }) {
 
             {/* ── RANGE MODE ── */}
             {!showLoading && mode === "range" && rangeSummary && (
-                <div ref={printRef} className="space-y-5 bg-white p-1 rounded-xl">
+                <div className="space-y-5 bg-white p-1 rounded-xl">
                     {/* Header */}
                     <div className="bg-gray-900 text-white rounded-xl p-5">
                         <div className="flex items-center justify-between">
@@ -416,7 +438,7 @@ function DailyReportView({ agents }) {
 
             {/* ── SINGLE DAY MODE ── */}
             {!showLoading && mode === "single" && dailyReport && (
-                <div ref={printRef} className="space-y-5 bg-white p-1 rounded-xl">
+                <div className="space-y-5 bg-white p-1 rounded-xl">
                     <div className="bg-gray-900 text-white rounded-xl p-5">
                         <div className="flex items-center justify-between">
                             <div>
@@ -467,7 +489,6 @@ function DailyReportView({ agents }) {
                                 <tbody className="divide-y">
                                     {byAgent.map((a, i) => (
                                         <tr key={i} className="hover:bg-gray-50">
-                                            {/* ✅ FIX: support both camelCase (new) and snake_case (old) */}
                                             <td className="px-4 py-2.5 font-medium text-gray-800">
                                                 {a.agentName || a.agent_name}
                                             </td>
@@ -555,13 +576,13 @@ function DailyReportView({ agents }) {
 // ─── MONTHLY REPORT ───────────────────────────────────────────────────────────
 function MonthlyReportView({ agents }) {
     const { fetchMonthlyReport, monthlyReport, isLoading, error } = useReportStore();
-    const printRef = useRef(null);
 
     const now = new Date();
     const [year, setYear] = useState(now.getFullYear());
     const [month, setMonth] = useState(now.getMonth() + 1);
     const [selectedAgentId, setSelectedAgentId] = useState("");
     const [isExporting, setIsExporting] = useState(false);
+    const [exportScope, setExportScope] = useState("global");
 
     const MONTHS = ["January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"];
@@ -578,8 +599,24 @@ function MonthlyReportView({ agents }) {
     };
     const handleExport = async () => {
         setIsExporting(true);
-        try { await exportToPDF(printRef, `monthly-report-${year}-${String(month).padStart(2, "0")}.pdf`); }
-        finally { setIsExporting(false); }
+        try {
+            const shouldUseAgent = exportScope === "per-agent" && selectedAgentId;
+            const targetAgent = shouldUseAgent
+                ? agents.find((a) => String(a.id) === String(selectedAgentId))
+                : null;
+            const agentName = targetAgent?.name;
+            const agentHostname = targetAgent?.hostname;
+
+            await downloadMonthlyPDF({
+                report: monthlyReport,
+                year,
+                month,
+                agentName,
+                agentHostname,
+            });
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const summary = monthlyReport?.summary || {};
@@ -596,7 +633,6 @@ function MonthlyReportView({ agents }) {
         : "-";
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
-    // Chart: stacked color/bw per day
     const chartData = dailyBreakdown.map((d) => ({
         date: new Date(d.print_date).toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
         color: Number(d.color_pages || 0),
@@ -633,11 +669,39 @@ function MonthlyReportView({ agents }) {
                     {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
 
-                <Button onClick={handleExport} disabled={isExporting || isLoading || !monthlyReport}
-                    className="ml-auto gap-2 bg-gray-900 hover:bg-gray-700 text-white" size="sm">
-                    <FileDown className="h-4 w-4" />
-                    {isExporting ? "Exporting..." : "Export PDF"}
-                </Button>
+                {/* Export Scope + Button */}
+                <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                        <button
+                            onClick={() => setExportScope("global")}
+                            className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "global"
+                                    ? "bg-white text-gray-900 shadow-sm font-medium"
+                                    : "text-gray-500"
+                                }`}
+                        >
+                            Global
+                        </button>
+                        <button
+                            onClick={() => setExportScope("per-agent")}
+                            disabled={!selectedAgentId}
+                            className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "per-agent" && selectedAgentId
+                                    ? "bg-white text-gray-900 shadow-sm font-medium"
+                                    : "text-gray-500 disabled:opacity-40"
+                                }`}
+                        >
+                            Per Agent
+                        </button>
+                    </div>
+                    <Button
+                        onClick={handleExport}
+                        disabled={isExporting || isLoading || !monthlyReport}
+                        className="gap-2 bg-gray-900 hover:bg-gray-700 text-white"
+                        size="sm"
+                    >
+                        <FileDown className="h-4 w-4" />
+                        {isExporting ? "Exporting..." : "Export PDF"}
+                    </Button>
+                </div>
             </div>
 
             {isLoading && (
@@ -653,7 +717,7 @@ function MonthlyReportView({ agents }) {
             )}
 
             {!isLoading && monthlyReport && (
-                <div ref={printRef} className="space-y-5 bg-white p-1 rounded-xl">
+                <div className="space-y-5 bg-white p-1 rounded-xl">
                     {/* Header */}
                     <div className="bg-gray-900 text-white rounded-xl p-5">
                         <div className="flex items-center justify-between">
@@ -788,7 +852,6 @@ function MonthlyReportView({ agents }) {
                                 <tbody className="divide-y">
                                     {byAgent.map((a, i) => (
                                         <tr key={i} className="hover:bg-gray-50">
-                                            {/* ✅ FIX: backend now returns camelCase */}
                                             <td className="px-4 py-2.5 font-medium text-gray-800">
                                                 {a.agentName || a.agent_name}
                                             </td>

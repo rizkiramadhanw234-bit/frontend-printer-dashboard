@@ -35,7 +35,6 @@ export default function PrinterDetailModal({ printer, isOpen, onClose }) {
     }
   };
 
-  // Support both camelCase (agent API) and snake_case (all-printers API)
   const colorPagesToday = printer.colorPagesToday ?? printer.color_pages_today ?? 0;
   const bwPagesToday = printer.bwPagesToday ?? printer.bw_pages_today ?? 0;
   const colorPagesTotal = printer.colorPagesTotal ?? printer.color_pages_total ?? 0;
