@@ -278,8 +278,8 @@ function DailyReportView({ agents }) {
                         <button
                             onClick={() => setExportScope("global")}
                             className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "global"
-                                    ? "bg-white text-gray-900 shadow-sm font-medium"
-                                    : "text-gray-500"
+                                ? "bg-white text-gray-900 shadow-sm font-medium"
+                                : "text-gray-500"
                                 }`}
                         >
                             Global
@@ -288,8 +288,8 @@ function DailyReportView({ agents }) {
                             onClick={() => setExportScope("per-agent")}
                             disabled={!selectedAgentId}
                             className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "per-agent" && selectedAgentId
-                                    ? "bg-white text-gray-900 shadow-sm font-medium"
-                                    : "text-gray-500 disabled:opacity-40"
+                                ? "bg-white text-gray-900 shadow-sm font-medium"
+                                : "text-gray-500 disabled:opacity-40"
                                 }`}
                         >
                             Per Agent
@@ -675,8 +675,8 @@ function MonthlyReportView({ agents }) {
                         <button
                             onClick={() => setExportScope("global")}
                             className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "global"
-                                    ? "bg-white text-gray-900 shadow-sm font-medium"
-                                    : "text-gray-500"
+                                ? "bg-white text-gray-900 shadow-sm font-medium"
+                                : "text-gray-500"
                                 }`}
                         >
                             Global
@@ -685,8 +685,8 @@ function MonthlyReportView({ agents }) {
                             onClick={() => setExportScope("per-agent")}
                             disabled={!selectedAgentId}
                             className={`px-2.5 py-1 rounded-md transition-all ${exportScope === "per-agent" && selectedAgentId
-                                    ? "bg-white text-gray-900 shadow-sm font-medium"
-                                    : "text-gray-500 disabled:opacity-40"
+                                ? "bg-white text-gray-900 shadow-sm font-medium"
+                                : "text-gray-500 disabled:opacity-40"
                                 }`}
                         >
                             Per Agent
@@ -712,7 +712,7 @@ function MonthlyReportView({ agents }) {
 
             {error && !isLoading && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{error}
+                    <AlertCircle className="h-4 w-4 shrink-0" />{error}
                 </div>
             )}
 
