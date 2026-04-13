@@ -65,52 +65,49 @@ export default function DashboardPage() {
     generateAlertsFromPrinters,
     initWebSocket,
     cleanup,
-    markAllAsRead
+    markAllAsRead,
   } = useAlertStore();
 
   const stats = useMemo(() => {
     return {
       total: allPrinters.length,
-      online: allPrinters.filter(p =>
-        ['READY', 'ONLINE', 'PRINTING'].includes(p.status)
+      online: allPrinters.filter((p) =>
+        ["READY", "ONLINE", "PRINTING"].includes(p.status)
       ).length,
-      offline: allPrinters.filter(p =>
-        ['OFFLINE', 'DISCONNECTED', 'OTHER', 'ERROR'].includes(p.status)
+      offline: allPrinters.filter((p) =>
+        ["OFFLINE", "DISCONNECTED", "OTHER", "ERROR"].includes(p.status)
       ).length,
-      lowInk: alerts.filter(a => a.type === 'low_ink' && a.status === 'active').length,
-      criticalInk: alerts.filter(a =>
-        (a.type === 'no_ink' || a.type === 'offline' || a.type === 'paper_jam') &&
-        a.severity === 'critical' &&
-        a.status === 'active'
+      lowInk: alerts.filter((a) => a.type === "low_ink" && a.status === "active")
+        .length,
+      criticalInk: alerts.filter(
+        (a) =>
+          (a.type === "no_ink" ||
+            a.type === "offline" ||
+            a.type === "paper_jam") &&
+          a.severity === "critical" &&
+          a.status === "active"
       ).length,
-      pagesToday: allPrinters.reduce((sum, p) => sum + (p.pages_today || 0), 0)
+      pagesToday: allPrinters.reduce(
+        (sum, p) => sum + (p.pages_today || 0),
+        0
+      ),
     };
   }, [allPrinters, alerts]);
 
-  const {
-    agentStats,
-    fetchAgentStats,
-    fetchPrintStats,
-  } = useStatsStore();
-
-  const {
-    health,
-    fetchHealth,
-    fetchSystemInfo,
-  } = useSystemStore();
-
-  const {
-    dailyReport,
-    fetchDailyReportToday,
-  } = useReportStore();
+  const { agentStats, fetchAgentStats, fetchPrintStats } = useStatsStore();
+  const { health, fetchHealth, fetchSystemInfo } = useSystemStore();
+  const { dailyReport, fetchDailyReportToday } = useReportStore();
 
   const [activeTab, setActiveTab] = useState("overview");
+  // ── NEW: active printer group filter ──────────────────────────────────────
+  const [activeGroupId, setActiveGroupId] = useState(null);
+  // ──────────────────────────────────────────────────────────────────────────
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({
     isOpen: false,
     companyId: null,
-    companyName: ''
+    companyName: "",
   });
   const [selectedPrinter, setSelectedPrinter] = useState(null);
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
@@ -118,14 +115,16 @@ export default function DashboardPage() {
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
 
-  const selectedAgent = agents.find(a => a.id === selectedAgentId);
-  const overviewPrinters = selectedAgent ? (agentPrinters[selectedAgentId] || []) : [];
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const overviewPrinters = selectedAgent
+    ? agentPrinters[selectedAgentId] || []
+    : [];
 
   useEffect(() => {
     const init = async () => {
       const authed = await checkAuth();
       setIsInitialized(true);
-      if (!authed) router.push('/login');
+      if (!authed) router.push("/login");
     };
     init();
   }, [checkAuth, router]);
@@ -141,32 +140,27 @@ export default function DashboardPage() {
             fetchSystemInfo(),
             fetchAllPrinters(),
             fetchAgentStats(),
-            fetchPrintStats()
+            fetchPrintStats(),
           ]);
-
-          const stats = getAllPrintersStatistics();
-
+          getAllPrintersStatistics();
           if (allPrinters.length > 0) {
-            generateAlertsFromPrinters(allPrinters, 'initial');
+            generateAlertsFromPrinters(allPrinters, "initial");
           }
         } catch (error) {
-          // Error handled silently
+          // silent
         }
       };
-
       loadInitialData();
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (allPrinters.length > 0) {
-      const stats = getAllPrintersStatistics();
-    }
+    if (allPrinters.length > 0) getAllPrintersStatistics();
   }, [allPrinters]);
 
   useEffect(() => {
     if (allPrinters.length > 0 && isAuthenticated) {
-      generateAlertsFromPrinters(allPrinters, 'printer_update');
+      generateAlertsFromPrinters(allPrinters, "printer_update");
     }
   }, [allPrinters, isAuthenticated, generateAlertsFromPrinters]);
 
@@ -181,13 +175,11 @@ export default function DashboardPage() {
     if (!isAuthenticated) return;
 
     const unsubPrinters = wsService.subscribeToPrinters(async (data) => {
-      if (data.type === 'printer_update') {
-        await fetchAllPrinters();
-      }
+      if (data.type === "printer_update") await fetchAllPrinters();
     });
 
     const unsubAgents = wsService.subscribeToAgents(async (data) => {
-      if (data.type === 'agent_disconnected') {
+      if (data.type === "agent_disconnected") {
         await fetchAllPrinters();
         await loadAgents();
       }
@@ -210,7 +202,7 @@ export default function DashboardPage() {
       setSelectedAgentId(agentId);
       await selectAgent(agentId);
     } catch (error) {
-      // Error handled silently
+      // silent
     }
   };
 
@@ -221,14 +213,13 @@ export default function DashboardPage() {
   const confirmDeleteCompany = async () => {
     const { companyId, companyName } = deleteConfirm;
     if (!companyId) return;
-
     try {
       await deleteCompany(companyId);
       alert(`Company "${companyName}" deleted successfully`);
     } catch (error) {
       alert(`Failed to delete company: ${error.message}`);
     } finally {
-      setDeleteConfirm({ isOpen: false, companyId: null, companyName: '' });
+      setDeleteConfirm({ isOpen: false, companyId: null, companyName: "" });
     }
   };
 
@@ -247,33 +238,34 @@ export default function DashboardPage() {
         fetchSystemInfo(),
         fetchAllPrinters(),
         fetchAgentStats(),
-        fetchPrintStats()
+        fetchPrintStats(),
       ]);
-
       if (selectedAgentId) {
         await fetchAgentPrinters(selectedAgentId);
         await fetchDailyReportToday(selectedAgentId);
       }
-
       if (allPrinters.length > 0) {
-        generateAlertsFromPrinters(allPrinters, 'refresh');
+        generateAlertsFromPrinters(allPrinters, "refresh");
       }
     } catch (error) {
-      // Error handled silently
+      // silent
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const handleMarkAllAlertsRead = () => {
-    markAllAsRead();
+  // ── Printer group subtitle helper ──────────────────────────────────────────
+  const getPrinterSubtitle = () => {
+    if (!activeGroupId) return `Total ${stats.total} printers across all agents`;
+    if (activeGroupId === "__ungrouped__") return "Showing ungrouped printers";
+    return "Filtered by group";
   };
 
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
@@ -282,15 +274,27 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          // Clear group filter when navigating away from printers
+          if (tab !== "printers") setActiveGroupId(null);
+        }}
         stats={stats}
         health={health}
+        allPrinters={allPrinters}
+        activeGroupId={activeGroupId}
+        onGroupSelect={(group) => {
+          setActiveGroupId(group?.id ?? null);
+          if (group) setActiveTab("printers"); // hanya navigate kalau beneran pilih group
+        }}
       />
 
       <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
@@ -312,7 +316,7 @@ export default function DashboardPage() {
 
               {activeTab === "printers" && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Total {stats.total} printers across all agents
+                  {getPrinterSubtitle()}
                 </p>
               )}
 
@@ -326,7 +330,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               {activeTab === "alerts" && unreadCount > 0 && (
                 <button
-                  onClick={handleMarkAllAlertsRead}
+                  onClick={markAllAsRead}
                   className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Bell className="h-4 w-4" />
@@ -338,12 +342,15 @@ export default function DashboardPage() {
                 disabled={appLoading || isRefreshing}
                 className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
               >
-                <RefreshCw className={`h-4 w-4 ${appLoading || isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`h-4 w-4 ${appLoading || isRefreshing ? "animate-spin" : ""}`}
+                />
                 Refresh
               </button>
             </div>
           </div>
 
+          {/* ── OVERVIEW ──────────────────────────────────────────────────── */}
           {activeTab === "overview" && (
             <>
               <StatsCards stats={stats} />
@@ -366,7 +373,7 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {alerts.slice(0, 3).map(alert => (
+                    {alerts.slice(0, 3).map((alert) => (
                       <div
                         key={alert.id}
                         className="text-sm p-2 bg-gray-50 rounded flex items-center gap-2 cursor-pointer hover:bg-gray-100"
@@ -375,11 +382,12 @@ export default function DashboardPage() {
                           setActiveTab("alerts");
                         }}
                       >
-                        {alert.severity === 'critical' ? (
-                          <AlertCircle className="h-4 w-4 text-red-500" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-yellow-500" />
-                        )}
+                        <AlertCircle
+                          className={`h-4 w-4 ${alert.severity === "critical"
+                              ? "text-red-500"
+                              : "text-yellow-500"
+                            }`}
+                        />
                         <span className="flex-1 truncate">{alert.message}</span>
                         <span className="text-xs text-gray-500">
                           {new Date(alert.timestamp).toLocaleTimeString()}
@@ -410,10 +418,7 @@ export default function DashboardPage() {
                       ))}
                     </select>
                   </div>
-
-                  {selectedAgentId && (
-                    <DailyReport agentId={selectedAgentId} />
-                  )}
+                  {selectedAgentId && <DailyReport agentId={selectedAgentId} />}
                 </div>
 
                 <div className="lg:col-span-2">
@@ -451,6 +456,7 @@ export default function DashboardPage() {
             </>
           )}
 
+          {/* ── PRINTERS ──────────────────────────────────────────────────── */}
           {activeTab === "printers" && (
             <PrinterTable
               onPrinterSelect={(printer) => {
@@ -458,9 +464,11 @@ export default function DashboardPage() {
                 setIsPrinterModalOpen(true);
               }}
               selectedPrinterId={selectedPrinter?.id}
+              activeGroupId={activeGroupId}         // ← NEW
             />
           )}
 
+          {/* ── AGENTS ────────────────────────────────────────────────────── */}
           {activeTab === "agents" && (
             <AgentTable
               mode="dashboard"
@@ -469,6 +477,7 @@ export default function DashboardPage() {
             />
           )}
 
+          {/* ── COMPANIES ─────────────────────────────────────────────────── */}
           {activeTab === "companies" && (
             <div className="bg-white rounded-lg border">
               <div className="p-6 border-b flex justify-between items-center">
@@ -495,7 +504,6 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-
               <div className="p-6">
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full">
@@ -519,21 +527,11 @@ export default function DashboardPage() {
                       ) : (
                         companies.map((company) => (
                           <tr key={company.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-xs text-gray-600">
-                              {company.id}
-                            </td>
-                            <td className="px-4 py-3 text-gray-900">
-                              {company.name}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">
-                              {company.email || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">
-                              {company.phone || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">
-                              {company.address || '-'}
-                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">{company.id}</td>
+                            <td className="px-4 py-3 text-gray-900">{company.name}</td>
+                            <td className="px-4 py-3 text-gray-600">{company.email || "-"}</td>
+                            <td className="px-4 py-3 text-gray-600">{company.phone || "-"}</td>
+                            <td className="px-4 py-3 text-gray-600">{company.address || "-"}</td>
                             <td className="px-4 py-3 text-right">
                               <button
                                 className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
@@ -557,12 +555,8 @@ export default function DashboardPage() {
           {activeTab === "departments" && (
             <div className="bg-white rounded-lg border p-12 text-center">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Department Management
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Click the button below to manage departments
-              </p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Department Management</h3>
+              <p className="text-gray-500 mb-4">Click the button below to manage departments</p>
               <button
                 onClick={() => setIsDepartmentModalOpen(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 inline-flex items-center gap-2"
@@ -580,9 +574,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {activeTab === "reports" && (
-            <ReportView />
-          )}
+          {activeTab === "reports" && <ReportView />}
 
           {activeTab === "settings" && (
             <div className="bg-white rounded-lg border p-12 text-center">
@@ -593,28 +585,23 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* ── Modals ────────────────────────────────────────────────────────── */}
         <CompanyModal
           isOpen={isCompanyModalOpen}
           onClose={() => setIsCompanyModalOpen(false)}
-          onSuccess={() => {
-            loadCompanies();
-            setIsCompanyModalOpen(false);
-          }}
+          onSuccess={() => { loadCompanies(); setIsCompanyModalOpen(false); }}
         />
-
         <DepartmentModal
           isOpen={isDepartmentModalOpen}
           onClose={() => setIsDepartmentModalOpen(false)}
         />
-
         <DeleteCompanyDialog
           isOpen={deleteConfirm.isOpen}
           companyName={deleteConfirm.companyName}
-          onClose={() => setDeleteConfirm({ isOpen: false, companyId: null, companyName: '' })}
+          onClose={() => setDeleteConfirm({ isOpen: false, companyId: null, companyName: "" })}
           onConfirm={confirmDeleteCompany}
           isLoading={appLoading}
         />
-
         <PrinterDetailModal
           printer={selectedPrinter}
           isOpen={isPrinterModalOpen}

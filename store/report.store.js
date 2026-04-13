@@ -305,5 +305,19 @@ export const useReportStore = create((set, get) => ({
         endDate: null
       }
     });
-  }
+  },
+
+  fetchRecords: async (params = {}) => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await api.getRecords(params);
+      set({ isLoading: false });
+      return response;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+
 }));

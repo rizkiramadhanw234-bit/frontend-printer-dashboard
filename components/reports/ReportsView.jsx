@@ -317,7 +317,7 @@ function DailyReportView({ agents }) {
             {/* Error */}
             {error && !showLoading && mode === "single" && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4 text-sm">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{error}
+                    <AlertCircle className="h-4 w-4 shrink-0" />{error}
                 </div>
             )}
 
@@ -436,7 +436,7 @@ function DailyReportView({ agents }) {
                 </div>
             )}
 
-            {/* ── SINGLE DAY MODE ── */}
+            {/*  SINGLE DAY MODE  */}
             {!showLoading && mode === "single" && dailyReport && (
                 <div className="space-y-5 bg-white p-1 rounded-xl">
                     <div className="bg-gray-900 text-white rounded-xl p-5">
@@ -573,7 +573,7 @@ function DailyReportView({ agents }) {
     );
 }
 
-// ─── MONTHLY REPORT ───────────────────────────────────────────────────────────
+//  MONTHLY REPORT 
 function MonthlyReportView({ agents }) {
     const { fetchMonthlyReport, monthlyReport, isLoading, error } = useReportStore();
 

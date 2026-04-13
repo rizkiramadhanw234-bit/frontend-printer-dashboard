@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { usePrinterStore } from "@/store/printer.store";
+import { usePrinterGroupStore } from "@/store/printer.group.store";
+import { AssignGroupModal } from "@/components/modals/PrinterGroupModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +29,10 @@ import {
   AlertCircle,
   Palette,
   ScanLine,
+  FolderOpen,
 } from "lucide-react";
 
-export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
+export default function PrinterTable({ onPrinterSelect, selectedPrinterId, activeGroupId = null }) {
   const {
     allPrinters,
     fetchAllPrinters,
@@ -37,6 +40,9 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     pausePrinter,
     resumePrinter,
   } = usePrinterStore();
+
+  const { groups, getGroupForPrinter, getUngroupedIds } = usePrinterGroupStore();
+  const [assignGroupPrinter, setAssignGroupPrinter] = useState(null);
 
   useEffect(() => {
     fetchAllPrinters();
@@ -49,9 +55,7 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Helper: support camelCase & snake_case
-  const getField = (printer, camel, snake) =>
-    printer[camel] ?? printer[snake] ?? 0;
+  const getField = (printer, camel, snake) => printer[camel] ?? printer[snake] ?? 0;
 
   const parseInkLevels = (inkLevels) => {
     if (!inkLevels) return {};
@@ -110,9 +114,18 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
       const matchesInk = inkFilter === "all" || inkStatus === inkFilter;
       const matchesVendor = vendorFilter === "all" || printer.vendor === vendorFilter;
 
-      return matchesSearch && matchesStatus && matchesInk && matchesVendor;
+      let matchesGroup = true;
+      if (activeGroupId === "__ungrouped__") {
+        const ungroupedIds = getUngroupedIds(allPrinters.map((p) => p.id));
+        matchesGroup = ungroupedIds.includes(printer.id);
+      } else if (activeGroupId) {
+        const group = groups.find((g) => g.id === activeGroupId);
+        matchesGroup = group ? group.printerIds.includes(printer.id) : false;
+      }
+
+      return matchesSearch && matchesStatus && matchesInk && matchesVendor && matchesGroup;
     });
-  }, [allPrinters, searchTerm, statusFilter, inkFilter, vendorFilter]);
+  }, [allPrinters, searchTerm, statusFilter, inkFilter, vendorFilter, activeGroupId, groups]);
 
   const totalPages = Math.ceil(filteredPrinters.length / itemsPerPage);
   const paginatedPrinters = filteredPrinters.slice(
@@ -133,17 +146,13 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
   const getStatusIcon = (printer) => {
     const inkStatus = getInkStatus(printer);
     const detailedStatus = getDetailedStatus(printer);
-    if (inkStatus === "critical" || detailedStatus === "no_ink")
-      return <Droplets className="h-4 w-4 text-red-500" />;
-    if (inkStatus === "low" || detailedStatus === "low_ink")
-      return <Droplets className="h-4 w-4 text-yellow-500" />;
-    if (["paper_jam", "out_of_paper", "door_open"].includes(detailedStatus))
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
+    if (inkStatus === "critical" || detailedStatus === "no_ink") return <Droplets className="h-4 w-4 text-red-500" />;
+    if (inkStatus === "low" || detailedStatus === "low_ink") return <Droplets className="h-4 w-4 text-yellow-500" />;
+    if (["paper_jam", "out_of_paper", "door_open"].includes(detailedStatus)) return <AlertCircle className="h-4 w-4 text-red-500" />;
     const s = printer.status?.toUpperCase();
     if (["READY", "ONLINE", "PRINTING"].includes(s)) return <Wifi className="h-4 w-4 text-green-500" />;
     if (s === "PAUSED" || detailedStatus === "paused") return <PauseCircle className="h-4 w-4 text-yellow-500" />;
-    if (["OTHER", "ERROR"].includes(s) || detailedStatus === "error_other")
-      return <AlertCircle className="h-4 w-4 text-orange-500" />;
+    if (["OTHER", "ERROR"].includes(s) || detailedStatus === "error_other") return <AlertCircle className="h-4 w-4 text-orange-500" />;
     return <WifiOff className="h-4 w-4 text-gray-400" />;
   };
 
@@ -169,7 +178,7 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
     return `${Math.floor(diff / 1440)}d ago`;
   };
 
-  useEffect(() => setCurrentPage(1), [searchTerm, statusFilter, inkFilter, vendorFilter]);
+  useEffect(() => setCurrentPage(1), [searchTerm, statusFilter, inkFilter, vendorFilter, activeGroupId]);
 
   return (
     <div className="space-y-4">
@@ -195,7 +204,6 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
           <div className="text-xs text-gray-500">Critical Ink</div>
           <div className="text-xl font-bold text-red-600">{stats.criticalInk}</div>
         </div>
-        {/* Color/BW today totals */}
         <div className="rounded-lg border p-3 bg-indigo-50">
           <div className="flex items-center gap-1 text-xs text-indigo-500 mb-0.5">
             <Palette className="h-3 w-3" /> Color Today
@@ -279,19 +287,16 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Printer</th>
+                {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group</th> */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Today</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-indigo-500 uppercase">
-                  <div className="flex items-center justify-center gap-1">
-                    <Palette className="h-3 w-3" /> Color
-                  </div>
+                  <div className="flex items-center justify-center gap-1"><Palette className="h-3 w-3" /> Color</div>
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  <div className="flex items-center justify-center gap-1">
-                    <ScanLine className="h-3 w-3" /> B&W
-                  </div>
+                  <div className="flex items-center justify-center gap-1"><ScanLine className="h-3 w-3" /> B&W</div>
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Pages</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
@@ -301,11 +306,11 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
             <tbody className="divide-y">
               {paginatedPrinters.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={12} className="px-4 py-12 text-center text-gray-500">
                     <Printer className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium text-gray-900 mb-1">No printers found</p>
                     <p className="text-sm">
-                      {searchTerm || statusFilter !== "all" || inkFilter !== "all" || vendorFilter !== "all"
+                      {searchTerm || statusFilter !== "all" || inkFilter !== "all" || vendorFilter !== "all" || activeGroupId
                         ? "Try adjusting your filters"
                         : "No printers registered in the system"}
                     </p>
@@ -316,6 +321,7 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                   const cpToday = getField(printer, "colorPagesToday", "color_pages_today");
                   const bwToday = getField(printer, "bwPagesToday", "bw_pages_today");
                   const pToday = printer.pages_today || 0;
+                  const printerGroup = getGroupForPrinter(printer.id);
 
                   return (
                     <tr
@@ -333,6 +339,19 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                           <div className="text-xs text-gray-400">ID: {printer.id}</div>
                         </div>
                       </td>
+
+                      {/* Group */}
+                      {/* <td className="px-4 py-3">
+                        {printerGroup ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            <FolderOpen className="h-3 w-3" />
+                            {printerGroup.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td> */}
+
                       <td className="px-4 py-3">
                         {printer.vendor ? <Badge variant="outline">{printer.vendor}</Badge> : "-"}
                       </td>
@@ -342,41 +361,27 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                           {printer.agent_id?.substring(0, 12)}...
                         </div>
                       </td>
-
-                      {/* Total today */}
                       <td className="px-4 py-3 text-center">
                         <Badge variant="outline" className="text-xs">{pToday}</Badge>
                       </td>
-
-                      {/* Color today */}
                       <td className="px-4 py-3 text-center">
                         {cpToday > 0 ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                             <Palette className="h-3 w-3" />{cpToday}
                           </span>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
+                        ) : <span className="text-xs text-gray-300">—</span>}
                       </td>
-
-                      {/* BW today */}
                       <td className="px-4 py-3 text-center">
                         {bwToday > 0 ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
                             <ScanLine className="h-3 w-3" />{bwToday}
                           </span>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
+                        ) : <span className="text-xs text-gray-300">—</span>}
                       </td>
-
-                      {/* Total lifetime */}
                       <td className="px-4 py-3 text-center text-sm text-gray-600">
                         {(printer.total_pages || 0).toLocaleString()}
                       </td>
-
                       <td className="px-4 py-3 text-sm text-gray-600">{formatLastSeen(printer.updated_at)}</td>
-
                       <td className="px-4 py-3 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -387,6 +392,9 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPrinterSelect?.(printer); }}>
                               <Eye className="h-4 w-4 mr-2" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setAssignGroupPrinter(printer); }}>
+                              <FolderOpen className="h-4 w-4 mr-2" /> Assign to Group
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-yellow-600"
@@ -437,6 +445,12 @@ export default function PrinterTable({ onPrinterSelect, selectedPrinterId }) {
           </div>
         </div>
       )}
+
+      <AssignGroupModal
+        printer={assignGroupPrinter}
+        isOpen={!!assignGroupPrinter}
+        onClose={() => setAssignGroupPrinter(null)}
+      />
     </div>
   );
 }
