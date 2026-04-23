@@ -134,6 +134,35 @@ export const api = {
       body: JSON.stringify({ printerName })
     }),
 
+    // printers group
+      getGroups: () =>
+    fetchAPI('/api/printer-groups'),
+ 
+  createGroup: (name) =>
+    fetchAPI('/api/printer-groups', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    }),
+ 
+  renameGroup: (groupId, name) =>
+    fetchAPI(`/api/printer-groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name })
+    }),
+ 
+  deleteGroup: (groupId) =>
+    fetchAPI(`/api/printer-groups/${groupId}`, { method: 'DELETE' }),
+ 
+  assignPrinterToGroup: (groupId, printerId) =>
+    fetchAPI(`/api/printer-groups/${groupId}/members`, {
+      method: 'PUT',
+      body: JSON.stringify({ printerId })
+    }),
+ 
+  unassignPrinterFromGroup: (groupId, printerId) =>
+    fetchAPI(`/api/printer-groups/${groupId}/members/${printerId}`, { method: 'DELETE' }),
+
+
   // ========== STATS ==========
   getAgentStats: () => fetchAPI('/api/stats/agents'),
   getPrintStats: () => fetchAPI('/api/stats/prints'),

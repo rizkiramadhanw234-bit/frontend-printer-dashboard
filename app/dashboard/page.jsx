@@ -9,6 +9,7 @@ import { useReportStore } from "@/store/report.store";
 import { useStatsStore } from "@/store/stats.store";
 import { useSystemStore } from "@/store/system.store";
 import { useAlertStore } from "@/store/alert.store";
+import { usePrinterGroupStore } from "@/store/printer.group.store";
 import Sidebar from "@/components/Sidebar";
 import AgentTable from "@/components/tables/AgentTable";
 import PrinterTable from "@/components/tables/PrinterTable";
@@ -97,6 +98,7 @@ export default function DashboardPage() {
   const { agentStats, fetchAgentStats, fetchPrintStats } = useStatsStore();
   const { health, fetchHealth, fetchSystemInfo } = useSystemStore();
   const { dailyReport, fetchDailyReportToday } = useReportStore();
+  const { groups, fetchGroups } = usePrinterGroupStore();
 
   const [activeTab, setActiveTab] = useState("overview");
   // ── NEW: active printer group filter ──────────────────────────────────────
@@ -141,6 +143,7 @@ export default function DashboardPage() {
             fetchAllPrinters(),
             fetchAgentStats(),
             fetchPrintStats(),
+            fetchGroups(),
           ]);
           getAllPrintersStatistics();
           if (allPrinters.length > 0) {

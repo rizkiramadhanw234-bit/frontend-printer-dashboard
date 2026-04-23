@@ -105,10 +105,10 @@ export default function Sidebar({
               <span className="text-gray-700">{isOnline ? "Online" : "Offline"}</span>
             </div>
           </div>
-          <div className="flex items-center justify-between text-xs mt-1.5">
+          {/* <div className="flex items-center justify-between text-xs mt-1.5">
             <span className="text-gray-600">Agents</span>
             <span className="text-gray-900 font-medium">{agentConnected}/{agentTotal}</span>
-          </div>
+          </div> */}
         </div>
 
         {/* Navigation */}
@@ -139,12 +139,12 @@ export default function Sidebar({
               );
             })}
 
-            {/* ── PRINTER GROUPS ─────────────────────────────────── */}
+            {/*  PRINTER GROUPS  */}
             <div className="pt-3">
               <div className="flex items-center justify-between px-2 mb-1">
                 <button
                   onClick={() => setGroupsExpanded((v) => !v)}
-                  className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-gray-700 uppercase tracking-wider hover:text-gray-600 transition-colors"
                 >
                   {groupsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   Printer Groups
