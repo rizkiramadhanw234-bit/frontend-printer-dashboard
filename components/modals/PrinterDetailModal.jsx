@@ -136,6 +136,10 @@ export default function PrinterDetailModal({ printer, isOpen, onClose }) {
               <div className="text-xs text-gray-500">Network</div>
               <div>{(printer.is_network || printer.isNetwork) ? "Yes" : "No"}</div>
             </div>
+            <div className="p-2 bg-gray-50 rounded col-span-2">
+              <div className="text-xs text-gray-500">Hostname</div>
+              <div className="font-mono text-xs">{printer.hostname || "-"}</div>
+            </div>
           </div>
 
           {/* Status */}
