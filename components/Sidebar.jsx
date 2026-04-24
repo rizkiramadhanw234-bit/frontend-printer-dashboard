@@ -235,7 +235,7 @@ export default function Sidebar({
         {/* download agent exe */}
         <div className="flex justify-center items-start pb-4">
           <Button className="bg-gray-600 w-35 text-xs">
-            <a href="/mps.exe" download="MPS Newton Agent Setup.exe">
+            <a href="/MPS Newton Agent Setup.exe" download="MPS Newton Agent Setup.exe">
               Download Agent
             </a>
           </Button>
