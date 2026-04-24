@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useAlertStore } from "@/store/alert.store";
 import { usePrinterGroupStore } from "@/store/printer.group.store";
 import { ManageGroupsModal } from "./modals/PrinterGroupModal";
+import Link from "next/link";
 
 export default function Sidebar({
   activeTab,
@@ -233,12 +234,11 @@ export default function Sidebar({
         </div>
 
         {/* download agent exe */}
-        <div className="flex justify-center items-start pb-4">
-          <Button className="bg-gray-600 w-35 text-xs">
-            <a href="/MPS Newton Agent Setup.exe" download="MPS Newton Agent Setup.exe">
-              Download Agent
-            </a>
-          </Button>
+        <div className="flex justify-center items-center pb-4">
+          <Link href={"https://github.com/rizkiramadhanw234-bit/frontend-printer-dashboard/releases/download/v1/MPS.Newton.Agent.Setup.zip"}
+            className="text-xs text-white text-center w-40 bg-gray-500 px-4 py-2 rounded-sm hover:bg-gray-600">
+            Download Agents
+          </Link>
         </div>
 
         {/* Footer */}
