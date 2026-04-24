@@ -387,8 +387,8 @@ export default function DashboardPage() {
                       >
                         <AlertCircle
                           className={`h-4 w-4 ${alert.severity === "critical"
-                              ? "text-red-500"
-                              : "text-yellow-500"
+                            ? "text-red-500"
+                            : "text-yellow-500"
                             }`}
                         />
                         <span className="flex-1 truncate">{alert.message}</span>

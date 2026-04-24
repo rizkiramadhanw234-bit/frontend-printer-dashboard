@@ -85,7 +85,7 @@ export default function Sidebar({
               <Printer className="h-4 w-4 text-white" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-gray-900">Printer Dashboard</div>
+              <div className="text-sm font-semibold text-gray-900">Newton MPS Dashboard</div>
               <div className="text-[10px] text-gray-500">
                 v{process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0"}
               </div>
@@ -232,6 +232,15 @@ export default function Sidebar({
           </div>
         </div>
 
+        {/* download agent exe */}
+        <div className="flex justify-center items-start pb-4">
+          <Button className="bg-gray-600 w-35 text-xs">
+            <a href="/mps.exe" download="MPS Newton Agent Setup.exe">
+              Download Agent
+            </a>
+          </Button>
+        </div>
+
         {/* Footer */}
         <div className="p-4 border-t border-gray-200">
           <Button
@@ -244,10 +253,10 @@ export default function Sidebar({
             <span className="flex-1 text-left">Logout</span>
           </Button>
           <div className="text-[10px] text-gray-400 text-center mt-3">
-            © {new Date().getFullYear()} Printer Dashboard
+            © {new Date().getFullYear()} Kudukuats Project
           </div>
         </div>
-      </div>
+      </div >
 
       <ManageGroupsModal
         isOpen={showManageModal}
