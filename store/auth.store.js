@@ -42,7 +42,7 @@ export const useAuthStore = create(
       logout: () => {
         localStorage.removeItem('jwt_token');
         localStorage.removeItem('auth-storage');
-        set({ user: null, token: null, isAuthenticated: false, error: null });
+        set({ user: null, token: null, isAuthenticated: false, error: null, isInitialized: false });
       },
 
       checkAuth: async () => {
@@ -78,11 +78,17 @@ export const useAuthStore = create(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
-        isAuthenticated: state.isAuthenticated
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          localStorage.setItem('jwt_token', state.token);
+        if (state) {
+          const token = localStorage.getItem('jwt_token');
+          if (!token) {
+            state.isAuthenticated = false;
+            state.user = null;
+            state.token = null;
+          } else {
+            state.isAuthenticated = false;
+          }
         }
       }
     }

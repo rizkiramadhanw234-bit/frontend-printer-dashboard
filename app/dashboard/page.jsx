@@ -101,9 +101,9 @@ export default function DashboardPage() {
   const { groups, fetchGroups } = usePrinterGroupStore();
 
   const [activeTab, setActiveTab] = useState("overview");
-  // ── NEW: active printer group filter ──────────────────────────────────────
+  // ── NEW: active printer group filter 
   const [activeGroupId, setActiveGroupId] = useState(null);
-  // ──────────────────────────────────────────────────────────────────────────
+
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({
@@ -124,12 +124,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const init = async () => {
+      const token = localStorage.getItem('jwt_token');
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
       const authed = await checkAuth();
       setIsInitialized(true);
-      if (!authed) router.push("/login");
+      if (!authed) router.replace("/login");
     };
     init();
-  }, [checkAuth, router]);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -257,7 +262,7 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Printer group subtitle helper ──────────────────────────────────────────
+  // ── Printer group subtitle helper 
   const getPrinterSubtitle = () => {
     if (!activeGroupId) return `Total ${stats.total} printers across all agents`;
     if (activeGroupId === "__ungrouped__") return "Showing ungrouped printers";
@@ -277,12 +282,11 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
+      {/*  SIDEBAR  */}
       <Sidebar
         activeTab={activeTab}
         onTabChange={(tab) => {
           setActiveTab(tab);
-          // Clear group filter when navigating away from printers
           if (tab !== "printers") setActiveGroupId(null);
         }}
         stats={stats}
@@ -291,7 +295,7 @@ export default function DashboardPage() {
         activeGroupId={activeGroupId}
         onGroupSelect={(group) => {
           setActiveGroupId(group?.id ?? null);
-          if (group) setActiveTab("printers"); // hanya navigate kalau beneran pilih group
+          if (group) setActiveTab("printers");
         }}
       />
 
